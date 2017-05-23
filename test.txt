@@ -1,0 +1,6 @@
+qw : { $mod : [12,4]}
+{ qty: { $mod: [ 4, 0 ] } }
+{QW : { $lt : 12 },QW : { $lt : 12 }}
+{ qty: { $in: [ 5, 15 ] }, qtyrt: { $nin: [ 5, 15 ] } }
+{ price: { $not: { $gt: 1.99 } } }
+{qwerty : "sdfsdgdhf sdfsdf",qwertyRRRRRRRRR : "sdfsdgdhf sdfsdf"}
