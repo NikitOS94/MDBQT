@@ -38,6 +38,18 @@
 
 \$not 							{yylval="NOT"; return NOT;}
 
+\$where							{return WHERE_OPERATOR;}
+
+\$or 							{yylval="OR"; return OR;}
+\$nor 							{yylval="NOR"; return NOR;}
+\$and							{yylval="AND"; return AND;}
+
+\$search						{return SEARCH_OPERATOR;}
+\$text							{return TEXT_OPERATOR;}
+\$language						{return LANGUAGE_OPERATOR;}
+\$caseSensitive					{return CASE_SENSITIVE_OPERATOR;}
+\$diacriticSensitive			{return DIACRITIC_SENSITIVE_OPERATOR;}
+
 \$comment						{return COMMENT_OPERATOR;}
 
 \$mod							{return MOD_OPERATOR;}
