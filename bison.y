@@ -3,253 +3,729 @@
     #include <stdio.h>
     #include <string.h>
     #include "structures.h"
+    #include "get_query.h"
 
-    void yyerror(char *s) { fprintf (stderr, "%s\n", s);}
+    #define lr_scope  "( "
+    #define rr_scope  " )"
+    #define ls_scope  "[ "
+    #define rs_scope  " ]"
+    #define not       "NOT "
+    #define and_op    " AND "
+    #define select    " SELECT "
+    #define comma     ","
+    #define any       "*"
 
-    _array *create_array(array_element *first_ae) {
-        _array *new_ar=malloc(sizeof(_array));
-        new_ar->first_ae=first_ae;
+    void yyerror(char *s) { fprintf (stderr, "%s\n", s); exit(0);}
+
+    void ns_error(char *s) { fprintf (stderr, "\n%s not supported by jsquery \n", s); exit(0);}
+    
+    _array *
+    create_array(array_element *first_ae) 
+    {
+        _array *new_ar = (_array *) malloc(sizeof(_array));
+        new_ar->first_ae = first_ae;
         return new_ar;
     }
 
-    array_element *create_array_element(leaf_value * value, array_element *next_ae) {
-        array_element *new_ae=malloc(sizeof(array_element));
-        new_ae->value=value;
-        new_ae->next_ae=next_ae;
+    array_element *
+    create_array_element(leaf_value * value, array_element *next_ae) 
+    {
+        array_element *new_ae=(array_element *) malloc(sizeof(array_element));
+        new_ae->value = value;
+        new_ae->next_ae = next_ae;
         return new_ae;
     }
 
-    operator *create_not_operator(operator *op) {
-        operator *new_op=malloc(sizeof(operator));
-        not_operator *nop=malloc(sizeof(operator));
-        nop->op=op;
-
-        new_op->type=NOP;
-        new_op->nop=nop;
-
-        return new_op;
+    operator *
+    create_not_operator(operator *op) 
+    {
+        not_operator *new_op = (not_operator *) malloc(sizeof(operator));
+        new_op->type = NOP;
+        new_op->op = op;
+        return (operator*) new_op;
     }
 
-    operator *create_mod_operator(leaf_value *divisor, leaf_value *remainder) {
-        operator *new_op=malloc(sizeof(operator));
-        mod_operator *mop=malloc(sizeof(mod_operator));
-        mop->divisor=divisor;
-        mop->remainder=remainder;
-        new_op->type=MOP;
-        new_op->mop=mop;
-
-        return new_op;
+    operator *
+    create_mod_operator(leaf_value *divisor, leaf_value *remainder) 
+    {
+        mod_operator *new_op = (mod_operator *) malloc(sizeof(mod_operator));
+        new_op->type = MOP;
+        new_op->divisor = divisor;
+        new_op->remainder = remainder;
+        return (operator*) new_op;
     }
 
-    operator *create_array_operator(char* op, _array *ar) {
-        operator *new_op=malloc(sizeof(operator));
-
-        array_operator *aop=malloc(sizeof(array_operator));
-        aop->array_op=op;
-        aop->ar=ar;
-
-        new_op->type=AOP;
-        new_op->aop=aop;
-
-        return new_op;
+    operator *
+    create_array_operator(array_operator_type op, _array *ar) 
+    {
+        array_operator *new_op = (array_operator *) malloc(sizeof(array_operator));
+        new_op->type = AOP;
+        new_op->array_op = op;
+        new_op->ar = ar;
+        return (operator*) new_op;
     }
 
-    operator *create_value_operator(char* op, leaf_value * value) {
-        operator *new_op=malloc(sizeof(operator));
-        value_operator *vop=malloc(sizeof(value_operator));
-        vop->value_op=op;
-        vop->value=value;
-
-        new_op->type=VOP;
-        new_op->vop=vop;
-       
-        return new_op;
+    operator *
+    create_value_operator(value_operator_type op, leaf_value * value) 
+    {
+        value_operator *new_op = (value_operator *) malloc(sizeof(value_operator));
+        new_op->type = VOP;  
+        new_op->value_op = op;
+        new_op->value = value;
+        return (operator*) new_op;
     }
 
-    leaf_value *create_string_value(char *str){
-      leaf_value *lv=malloc(sizeof(leaf_value));
-      lv->type=S;
-      lv->str=str;
+    leaf_value *
+    create_string_value(char *str)
+    {
+        leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+        lv->type = S;
+        lv->str = str;
+        return lv;
+    }
+
+    leaf_value *
+    create_double_value(char* d)
+    {
+        leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+        lv->type = D;
+        lv->d = d;
+        return lv;
+    }
+
+    leaf_value *
+    create_integer_value(char* i)
+    {
+        leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+        lv->type = I;
+        lv->i = i;
+        return lv;
+    }
+
+    leaf_value *
+    create_array_value(_array *ar)
+    {
+      leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+      lv->type = A;
+      lv->ar = ar;
       return lv;
     }
 
-    leaf_value *create_double_value(float d){
-      leaf_value *lv=malloc(sizeof(leaf_value));
-      lv->type=D;
-      lv->d=d;
+    leaf_value *
+    create_boolean_value(bool b)
+    {
+      leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+      lv->type = B;
+      lv->b = b;
       return lv;
     }
 
-    leaf_value *create_integer_value(int i){
-      leaf_value *lv=malloc(sizeof(leaf_value));
-      lv->type=I;
-      lv->i=i;
-      return lv;
-    }
-
-    leaf_value *create_array_value(_array *ar){
-      leaf_value *lv=malloc(sizeof(leaf_value));
-      lv->type=A;
-      lv->ar=ar;
-      return lv;
-    }
-
-    leaf_value *create_boolean_value(bool b){
-      leaf_value *lv=malloc(sizeof(leaf_value));
-      lv->type=B;
-      lv->b=b;
-      return lv;
-    }
-
-    operator_list *create_operator_list(operator *op, struct operator_list *ol) {
-        
-        operator_list *new_ol=malloc(sizeof(operator_list));
-        new_ol->op=op;
-        new_ol->next_op=ol;      
+    operator_list *
+    create_operator_list(operator *op, struct operator_list *ol) 
+    {
+        operator_list *new_ol = (operator_list *) malloc(sizeof(operator_list));
+        new_ol->op = op;
+        new_ol->next_op = ol;      
         return new_ol;
     }
 
-    operator_object *create_operator_object(operator_list *ol) {
-        
-        operator_object *new_oob=malloc(sizeof(operator_object));
-        new_oob->ol=ol;
+    operator_object *
+    create_operator_object(operator_list *ol) 
+    {
+        operator_object *new_oob = (operator_object *) malloc(sizeof(operator_object));
+        new_oob->ol = ol;
         return new_oob;
     }
 
-    value *create_operator_object_value(operator_object *oob) {
-        value *vl=malloc(sizeof(value));
-        vl->type=OP_OBJECT;
-        vl->oob=oob;
+    value *
+    create_operator_object_value(operator_object *oob) 
+    {
+        value *vl = (value *) malloc(sizeof(value));
+        vl->type = OP_OBJECT;
+        vl->oob = oob;
         return vl;
     }
 
-    value *create_leaf_value_value(leaf_value *lv) {
-        value *vl=malloc(sizeof(value));
-        vl->type=LF_VALUE;
-        vl->lv=lv;
+    value *
+    create_leaf_value_value(leaf_value *lv) 
+    {
+        value *vl = (value *) malloc(sizeof(value));
+        vl->type = LF_VALUE;
+        vl->lv = lv;
         return vl;
     }
 
-    leaf_clause *create_leaf_clause(char* key, value *vl) {
-        
-        leaf_clause *new_lc=malloc(sizeof(leaf_clause));
-        new_lc->key=key;
-        new_lc->vl=vl;
-        return new_lc;
+    clause *
+    create_leaf_clause(char* key, value *vl) 
+    {
+        leaf_clause *new_lc = (leaf_clause *) malloc(sizeof(leaf_clause));
+        new_lc->type = LEAF;
+        new_lc->key = key;
+        new_lc->vl = vl;
+        return ( clause* ) new_lc;
     }
 
-    comment_clause *create_comment_clause(char *op, char *str) {
-        
-        comment_clause *new_com_cl=malloc(sizeof(comment_clause));
-        new_com_cl->op=op;
-        new_com_cl->str=str;
-        return new_com_cl;
+    clause *
+    create_comment_clause(char *op, char *str) 
+    {
+        comment_clause *new_com_cl = (comment_clause *) malloc(sizeof(comment_clause));
+        new_com_cl->type = COMMENT;
+        new_com_cl->op = op;
+        new_com_cl->str = str;
+        return ( clause* ) new_com_cl;
     }
 
-    clause *leaf_clause_to_clause(leaf_clause *leaf_cl){
-      
-      clause *clse=malloc(sizeof(clause));
-      clse->type=LEAF;
-      clse->leaf_cl=leaf_cl;
-     
-      return clse;
-    }
-
-    clause *comment_clause_to_clause(comment_clause *comm_clause){
-      
-      clause *clse=malloc(sizeof(clause));
-      clse->type=COMMENT;
-      clse->comm_clause=comm_clause;
-     
-      return clse;
-    }
-
-    where_clause_value *string_to_where_clause_value(char *str){
-      
-        where_clause_value *wcv=malloc(sizeof(where_clause_value));
-        wcv->str=str;   
+    where_clause_value *
+    string_to_where_clause_value(char *str)
+    {
+        where_clause_value *wcv = (where_clause_value *) malloc(sizeof(where_clause_value));
+        wcv->str = str;   
         return wcv;
     }
 
-    where_clause *create_where_clause(char *op, where_clause_value *wcv){
-      
-        where_clause *wc=malloc(sizeof(where_clause));
-        wc->op=op;
-        wc->wcv=wcv;
-     
-        return wc;
+    clause *
+    create_where_clause(char *op, where_clause_value *wcv)
+    {
+        where_clause *wc = (where_clause *) malloc(sizeof(where_clause));
+        wc->type = WHERE;
+        wc->op = op;
+        wc->wcv = wcv;
+        return (clause *) wc;
     }
 
-    clause *where_clause_to_clause(where_clause *where_cl){
-      
-        clause *clse=malloc(sizeof(clause));
-        clse->type=WHERE;
-        clse->where_cl=where_cl;
-        return clse;
-    }
-
-    clause_list *create_clause_list(clause *cl,clause_list *next_cll){
-
-        clause_list *cll=malloc(sizeof(clause_list));
-        cll->cl=cl;
-        cll->next_cll=next_cll;
+    clause_list *
+    create_clause_list(clause *cl,clause_list *next_cll)
+    {
+        clause_list *cll = (clause_list *) malloc(sizeof(clause_list));
+        cll->cl = cl;
+        cll->next_cll = next_cll;
         return cll;
     }
 
-    expression *create_expression(clause_list *cll){
-
-        expression *exp=malloc(sizeof(expression));
-        exp->cll=cll;
+    expression *
+    create_expression(clause_list *cll)
+    {
+        expression *exp = (expression *) malloc(sizeof(expression));
+        exp->cll = cll;
         return exp;
     }
 
-    expression_list *create_expression_list(expression *exp, expression_list *next_exp){
-
-        expression_list *exp_list=malloc(sizeof(expression_list));
-        exp_list->exp=exp;
-        exp_list->next_exp=next_exp;
+    expression_list *
+    create_expression_list(expression *exp, expression_list *next_exp)
+    {
+        expression_list *exp_list = (expression_list *) malloc(sizeof(expression_list));
+        exp_list->exp = exp;
+        exp_list->next_exp = next_exp;
         return exp_list;
     }
 
-    expression_clause *create_expression_tree_clause(char* op, expression_list *exp){
-      expression_clause *exp_cl=malloc(sizeof(expression_clause));
-      exp_cl->op=op;
-      exp_cl->exp=exp;
-      return exp_cl;
+    clause *
+    create_expression_tree_clause(expression_operator_type op, expression_list *exp)
+    {
+        expression_clause *exp_cl = (expression_clause *) malloc(sizeof(expression_clause));
+        exp_cl->type = EXPRESSION;
+        exp_cl->op = op;
+        exp_cl->exp = exp;
+        return (clause *) exp_cl;
     }
 
-    clause *expression_tree_clause_to_clause(expression_clause *exp_cl){
-    
-        clause *cl=malloc(sizeof(clause));
-        cl->type=EXPRESSION;
-        cl->exp_cl=exp_cl;
-        return cl; 
+    clause *
+    create_text_clause(char* search_str, bool lang_op, char* lang_str,bool case_sense, bool diacr_sense)
+    {
+        text_clause *text_cl = (text_clause *) malloc(sizeof(text_clause));
+        text_cl->type = TEXT;
+        text_cl->search_str = search_str;
+        text_cl->lang_op = lang_op;
+        text_cl->lang_str = lang_str;
+        text_cl->case_sense = case_sense;
+        text_cl->diacr_sense = diacr_sense;
+        return (clause *) text_cl;
     }
 
-    text_clause *create_text_clause(char* search_str, bool lang_op, char* lang_str,bool case_sense, bool diacr_sense){
-        text_clause *text_cl=malloc(sizeof(text_clause));
-        text_cl->search_str=search_str;
-        text_cl->lang_op=lang_op;
-        text_cl->lang_str=lang_str;
-        text_cl->case_sense=case_sense;
-        text_cl->diacr_sense=diacr_sense;
-        return text_cl;
-    }
-
-    clause *text_clause_to_clause(text_clause *text_cl){
-    
-        clause *cl=malloc(sizeof(clause));
-        cl->type=TEXT;
-        cl->text_cl=text_cl;
-        return cl; 
-    }
-
-    query *create_query(expression * exp){
-
-        query *qu=malloc(sizeof(query));
-        qu->exp=exp;
+    query *
+    create_query(expression *exp)
+    {
+        query *qu = (query *) malloc(sizeof(query));
+        qu->exp = exp;
         return qu;
     }
+
+    char*
+    get_leaf_value_eq(char *key, leaf_value *lv)
+    {
+        static const char eq[] = " = ";
+        char *leaf_val = get_leaf_value(lv);
+
+        char *result = (char *) malloc(sizeof(*result) * (
+                                                    strlen(key)+
+                                                    strlen(eq)+
+                                                    strlen(leaf_val)
+                                              ));
+        strcpy(result, key);
+        strcat(result, eq);
+        strcat(result, leaf_val);
+        printf("%s\n", result);
+        return result;
+    }
+
+    char *
+    get_leaf_clause_value(char* key, value *val)
+    { 
+       switch(val->type)
+        {
+            case LF_VALUE:
+                return get_leaf_value_eq(key, val->lv);
+            case OP_OBJECT:
+                return get_operator_object(key, val->oob);
+        }
+    }
+
+    char *
+    get_value_operator_type(value_operator_type vop_type)
+    {
+        switch(vop_type)
+        {
+            case _LESS :
+                return " < ";
+            case _EQ :
+            case _NOTEQ :
+                return " = ";
+            case _LESSEQ :
+                return " <= ";
+            case _GREAT :
+                return " > ";
+            case _GREATEQ :
+                return " >= ";
+            case _TYPE :
+                return "";
+            case _SIZE :
+                return ".@# = ";
+            case _EXISTS :
+                return " = *";
+        }
+    }
+    
+    char *
+    get_value_type(char *value_type)
+    {
+        if(strcmp(value_type,"\"string\"") == 0)              return " IS STRING";
+        else if(
+                    strcmp(value_type, "\"double\"") == 0 || 
+                    strcmp(value_type, "\"int\"") == 0 || 
+                    strcmp(value_type, "\"long\"") == 0 || 
+                    strcmp(value_type, "\"decimal\"") == 0
+                )                                             return " IS NUMERIC";
+                                 
+        else if(strcmp(value_type, "\"array\"") == 0)         return " IS ARRAY";
+        else if(strcmp(value_type, "\"object\"") == 0)        return " IS OBJECT";
+        else if(strcmp(value_type, "\"bool\"") == 0)          return " IS BOOLEAN";
+        else                                                  ns_error(value_type);
+    }
+
+    char *
+    get_value_operator(char *key, value_operator *vop)
+    {
+        char *result;
+        char *opr = get_value_operator_type(vop->value_op);
+
+        if(vop->value_op == _EXISTS)
+        {
+            if(vop->value->b)
+            {            
+                result = (char *) malloc(sizeof(*result) * (
+                                                                strlen(key)+
+                                                                strlen(opr)
+                                                            ));
+                strcpy(result, key); 
+                strcat(result, opr);
+            }
+            else
+            {
+                result = (char *) malloc(sizeof(*result) * (
+                                                                strlen(not)+
+                                                                strlen(lr_scope)+
+                                                                strlen(key)+
+                                                                strlen(opr)+
+                                                                strlen(rr_scope)
+                                                            ));
+                strcpy(result, not); 
+                strcat(result, lr_scope);
+                strcat(result, key);
+                strcat(result, opr);
+                strcat(result, rr_scope);
+            }
+
+            return result;
+        }
+
+        char *value = get_leaf_value(vop->value);
+        if(vop->value_op == _TYPE)
+        {
+            char *value_type = get_value_type(value);
+            result = (char *) malloc(sizeof(*result) * (
+                                                strlen(key)+
+                                                strlen(value_type)
+                                              ));
+            strcpy(result, key); 
+            strcat(result, value_type);
+            return result;
+        }
+
+        if(vop->value_op == _NOTEQ)
+        {
+            result = (char *) malloc(sizeof(*result) * (
+                                                strlen(not)+
+                                                strlen(lr_scope)+
+                                                strlen(key)+
+                                                strlen(opr)+
+                                                strlen(value)+
+                                                strlen(rr_scope)
+                                              ));
+            strcpy(result, not);
+            strcat(result, lr_scope);
+            strcat(result, key); 
+            strcat(result, opr);
+            strcat(result, value);
+            strcat(result, rr_scope);
+
+            return result;
+        }
+
+        result = (char *) malloc(sizeof(*result) * (
+                                            strlen(key)+
+                                            strlen(opr)+
+                                            strlen(value)
+                                          ));
+        strcpy(result, key); 
+        strcat(result, opr);
+        strcat(result, value);
+
+        return result;
+    }
+
+    char *
+    get_operator(char *key, operator *op)
+    {
+        switch(op->type)
+        {
+            case NOP :
+                return get_not_operator(key, (not_operator*) op );
+            case MOP :
+                ns_error("Module operator not suppported by jsquery"); //not supported by jsquery
+            case AOP :
+                return get_array_operator(key, (array_operator*) op );
+            case VOP :
+                return get_value_operator(key, (value_operator*) op );
+        }
+    }
+
+    char* 
+    get_not_operator(char *key, not_operator *op)
+    {
+        char *oper=get_operator(key,op->op);
+        char *result=(char*) malloc(sizeof(*result) * (
+                                                            strlen(not)+
+                                                            strlen(lr_scope)+
+                                                            strlen(oper)+
+                                                            strlen(rr_scope)   
+                                                       ));
+        strcpy(result, not);
+        strcat(result, lr_scope);
+        strcat(result, oper);
+        strcat(result, rr_scope);
+
+        return result;
+    }
+
+    char *
+    get_operator_list(char *key, operator_list *op_list)
+    {
+        char *op_str = get_operator(key,op_list->op);  
+        char *oper = (char *) malloc(sizeof(*oper) * (
+                                                        strlen(lr_scope)+
+                                                        strlen(op_str)+
+                                                        strlen(rr_scope)
+                                                     ));
+
+        strcpy(oper, lr_scope);
+        strcat(oper, op_str);
+        strcat(oper, rr_scope);
+        
+        if(op_list->next_op != NULL)
+        {
+            char *op_list_str = get_operator_list(key,op_list->next_op);
+            char *result = (char *) malloc(sizeof(*result) * (
+                                                                strlen(oper)+
+                                                                strlen(and_op)+
+                                                                strlen(op_list_str)
+                                                             ));
+            strcpy(result, oper);
+            strcat(result, and_op);
+            strcat(result, op_list_str);
+
+            return result;
+        }
+      
+        return oper;
+    }
+
+    char *
+    get_operator_object(char *key,operator_object *op_object)
+    {
+        return get_operator_list(key, op_object->ol);
+    }
+    
+    char *
+    get_leaf_clause(leaf_clause *lc)
+    {
+        return get_leaf_clause_value(lc->key, lc->vl);
+    }
+
+    char *
+    get_expression_list(expression_operator_type exp_op, expression_list* exp_list)
+    {         
+        char *exp = get_expression(exp_list->exp);
+        char *expr_result = (char *) malloc(sizeof(*expr_result) * (
+                                                                        strlen(lr_scope)+
+                                                                        strlen(exp)+
+                                                                        strlen(rr_scope)
+                                                                    ));
+        strcpy(expr_result, lr_scope);
+        strcat(expr_result, exp);
+        strcat(expr_result, rr_scope);
+
+        if(exp_list->next_exp != NULL)
+        {
+            char *next_exp = get_expression_list(exp_op, exp_list->next_exp);
+            char *op = get_expression_operator(exp_op);
+            char *result = (char *) malloc(sizeof(*result) * (
+                                                                strlen(expr_result)+
+                                                                strlen(op)+
+                                                                strlen(next_exp)
+                                                             ));
+            strcpy(result, expr_result);
+            strcat(result, op);
+            strcat(result, next_exp);
+
+            return result;
+        }
+
+        return expr_result; 
+    }
+
+    char *
+    get_expression_operator(expression_operator_type exp_op)
+    {
+        switch(exp_op)
+        {
+            case _AND :
+                return " AND ";
+            case _OR :
+                return " OR ";
+            case _NOR :
+                return " NOR ";
+        }
+    }
+
+    char *
+    get_expression_clause(expression_clause* exp_clause)
+    {
+        return get_expression_list(exp_clause->op, exp_clause->exp);
+    }
+
+    char *
+    get_text_clause(text_clause* t_clause)
+    {
+        static const char eq[] = " = ";
+        char *search_str=t_clause->search_str;
+        char *result=(char *) malloc((*result) * (
+                                                        strlen(any)+
+                                                        strlen(eq)+
+                                                        strlen(search_str)
+                                                 ));
+        strcpy(result, any);
+        strcat(result, eq);
+        strcat(result, search_str);
+
+        return result;
+    }
+
+    char *
+    get_clause(clause *cl)
+    {  
+        switch(cl->type)
+        {
+            case LEAF :
+                return get_leaf_clause((leaf_clause*) cl);
+            case COMMENT :
+                ns_error("COMMENT clause");  //Not supported by jsquery
+            case TEXT :
+                return get_text_clause((text_clause*) cl);
+            case WHERE :
+                ns_error("WHERE clause");  //Not supported by jsquery
+            case EXPRESSION :
+                return get_expression_clause((expression_clause*) cl);
+        }
+    }
+
+    char *
+    get_clause_list(clause_list *cll)
+    {
+        char *cl = get_clause(cll->cl);
+        if(cll->next_cll != NULL)
+        {
+            char *cl_list = get_clause_list(cll->next_cll);
+            char *result = (char*) malloc(sizeof(*result) * (
+                                                                strlen(cl)+
+                                                                strlen(and_op)+
+                                                                strlen(cl_list)
+                                                            ));
+            strcpy(result, cl);
+            strcat(result, and_op);
+            strcat(result, cl_list);
+
+            return result;
+        }
+
+        return cl;
+    }
+
+    char *
+    get_expression(expression * ex)
+    {
+        char *cll = get_clause_list(ex->cll);
+        return cll;
+    }
+
+    char *
+    get_jsquery(query *qu)
+    {
+        char *expr=get_expression(qu->exp);
+      
+        printf("%s\n", expr);
+      /*
+        static const char quote[]="'";
+        char *result=(char *) malloc(sizeof(*result) * (
+                                                    strlen(quote)+
+                                                    strlen(select)+
+                                                    strlen(quote)
+                                                ));
+        strcpy(result, quote);
+        strcat(result, expr);
+        strcat(result, quote);
+        printf("%s\n", result);
+*/
+        return expr;
+    }
+
+    char *
+    get_leaf_value(leaf_value *value)
+    {
+        switch(value->type)
+        {
+            case S :
+                return value->str;
+            case I :
+                return value->i;
+            case A :
+                return get_array(value->ar);
+            case B :
+                return (value->b==false ? "false" : "true");
+            case D :
+                return value->d;
+        }
+    }
+
+    char *
+    get_array_element(array_element *ae)
+    {
+        if(ae->next_ae == NULL)
+            return get_leaf_value(ae->value);
+        else
+        {
+            char *value = get_leaf_value(ae->value);
+            char *next_ar_el = get_array_element(ae->next_ae);
+            char *result = (char *) malloc(sizeof(*result) * (
+                                                                strlen(value)+
+                                                                strlen(comma)+
+                                                                strlen(next_ar_el)
+                                                             ));
+            strcpy(result, value);
+            strcat(result, comma);
+            strcat(result, next_ar_el);
+
+            return result;
+        }
+    }
+
+    char *
+    get_array(_array * ar)
+    { 
+        char* ar_elements = get_array_element(ar->first_ae);
+        char* result = (char *) malloc(sizeof(*result) * (
+                                                    strlen(ls_scope)+
+                                                    strlen(ar_elements)+
+                                                    strlen(rs_scope)
+                                                ));
+        strcpy(result, ls_scope);
+        strcat(result, ar_elements);
+        strcat(result, rs_scope);
+
+        return result;
+    }
+
+    char *
+    get_array_operator_type(array_operator_type aop_type)
+    {
+        switch(aop_type)
+        {
+            case _IN:
+            case _NIN:
+                return " <@ ";
+            case _ALL:
+                return " && ";
+        }
+    }
+
+    char *
+    get_array_operator(char *key, array_operator *aop)
+    {        
+        char *ar = get_array(aop->ar);
+        char *ar_operator = get_array_operator_type(aop->array_op);
+        char *result;
+
+        if(aop->array_op == _NIN)
+        {
+            result = (char *) malloc(sizeof(*result) * (
+                                                strlen(not)+
+                                                strlen(lr_scope)+
+                                                strlen(key)+
+                                                strlen(ar_operator)+
+                                                strlen(ar)+
+                                                strlen(rr_scope)
+                                              ));
+            strcpy(result, not);
+            strcat(result, lr_scope);
+            strcat(result, key);
+            strcat(result, ar_operator);
+            strcat(result, ar);
+            strcat(result, rr_scope);
+
+            return result;
+        }
+
+        result = (char *) malloc(sizeof(*result) * (
+                                            strlen(key)+
+                                            strlen(ar_operator)+
+                                            strlen(ar)
+                                          ));
+        strcpy(result, key);
+        strcat(result, ar_operator);
+        strcat(result, ar);
+        return result;    
+    }
+
+
 
 %}
 
@@ -259,15 +735,10 @@
     expression        *exp;
     clause_list       *cll;
     clause            *cl;
-    leaf_clause       *leaf_cl;
-    comment_clause    *comm_cl;
-    expression_clause *exp_cl;
     expression_list   *exp_list;
     value             *vl;
     leaf_value        *lv;
-    text_clause       *text_cl;
 
-    where_clause       *wc;
     where_clause_value *wcv;
 
     char *            strval;
@@ -276,6 +747,10 @@
     _array            *arrval;
     bool              boolval;
     
+    array_operator_type         aop_type;
+    expression_operator_type    exop_type;
+    value_operator_type         valop_type;
+
     operator_object   *oob;
     operator_list     *ol;
     operator          *op;
@@ -286,16 +761,12 @@
 %type<qu>         QUERY
 %type<exp>        EXPRESSION
 %type<cll>        CLAUSE_LIST
-%type<cl>         CLAUSE
-%type<leaf_cl>    LEAF_CLAUSE
-%type<comm_cl>    COMMENT_CLAUSE
-%type<exp_cl>     EXPRESSION_TREE_CLAUSE
-%type<text_cl>    TEXT_CLAUSE
+%type<cl>         CLAUSE TEXT_CLAUSE EXPRESSION_TREE_CLAUSE LEAF_CLAUSE COMMENT_CLAUSE WHERE_CLAUSE
 %type<vl>         VALUE
 
 %type<exp_list>   EXPRESSION_LIST
 
-%type<strval>     KEY VALUE_OPERATOR ARRAY_OPERATOR
+%type<strval>     KEY 
 %type<op>         OPERATOR
 %type<oob>        OPEARATOR_OBJECT
 %type<ol>         OPERATOR_LIST
@@ -304,52 +775,47 @@
     
 %type<ae>         LEAF_VALUE_LIST
 
-%type<wc>         WHERE_CLAUSE
 %type<wcv>        WHERE_CLAUSE_VALUE
 %type<strval>     WHERE_OPERATOR
 %token            WHERE_OPERATOR
 
-/* Operators */
+/* OPERATORS */
 
-/* Tree */
-%type<strval> TREE_OPERATOR OR NOR AND
-%token OR NOR AND
+/* Tree operator */
+%type<exop_type>    TREE_OPERATOR OR NOR AND
+%token              OR NOR AND
 
-/* Compare */
- %type<strval>    EQ LESS GREAT LESSEQ GREATEQ NOTEQ TYPE SIZE EXISTS NOT
- %token           EQ NOTEQ LESS LESSEQ GREAT GREATEQ TYPE SIZE EXISTS NOT
+/* Leaf value operator */
+ %type<valop_type>    EQ LESS GREAT LESSEQ GREATEQ NOTEQ TYPE SIZE EXISTS NOT VALUE_OPERATOR
+ %token               EQ NOTEQ LESS LESSEQ GREAT GREATEQ TYPE SIZE EXISTS NOT
 
-/* Array */
-%type<strval>     IN NIN ALL
+/* Array operator */
+%type<aop_type>   IN NIN ALL ARRAY_OPERATOR
 %token            IN NIN ALL
 
-/* Mod */
+/* Mod operator */
 %type<strval>     MOD_OPERATOR 
 %type<lv>         DIVISOR REMAINDER
 %token            MOD_OPERATOR
 
-/* Comment */
+/* Comment clause operator */
 %type<strval>     COMMENT_OPERATOR
 %token            COMMENT_OPERATOR
 
-/* Text clause */
+/* Text clause operator */
 %type<strval>     DIACRITIC_SENSITIVE_OPERATOR CASE_SENSITIVE_OPERATOR LANGUAGE_OPERATOR SEARCH_OPERATOR TEXT_OPERATOR
 %token            DIACRITIC_SENSITIVE_OPERATOR CASE_SENSITIVE_OPERATOR LANGUAGE_OPERATOR SEARCH_OPERATOR TEXT_OPERATOR
 
-/* Bson document structure */
-//%type<strval> DOCUMENT MEMBER_LIST MEMBER
-
-
 /* Type of values */
 %type<lv> LEAF_VALUE
-%type<intval> INT
+%type<strval> INT
 %type<strval> STRING
-%type<dubval> DOUBLE
+%type<strval> DOUBLE
 %type<arrval> ARRAY
 %type<boolval> BOOLEAN    
-
 %token INT STRING DOUBLE BOOLEAN
 
+/* Scope types */
 %token LSCOPE RSCOPE COMMA LSQBRACKET RSQBRACKET LRBRACKET RRBRACKET
 
 
@@ -358,53 +824,57 @@
 
 %%
 
-QUERY       : EXPRESSION {$$=create_query($1); 
-            printf("adsasdad %s\n", ($$->exp->cll->cl->leaf_cl->vl->oob->ol->op->vop->value->i)); exit(0); };
-
-EXPRESSION  : LSCOPE CLAUSE_LIST RSCOPE { $$=create_expression( $2 ); };
-
-CLAUSE_LIST : CLAUSE COMMA CLAUSE_LIST  { $$=create_clause_list( $1, $3 ); }
-            | CLAUSE                    { $$=create_clause_list( $1, NULL ); }
+QUERY       : EXPRESSION {$$ = create_query($1); char *result=get_jsquery($$); exit(0); }
             ;
 
-CLAUSE      : LEAF_CLAUSE             { $$=leaf_clause_to_clause($1); }
-            | COMMENT_CLAUSE          { $$=comment_clause_to_clause($1); }
-            | WHERE_CLAUSE            { $$=where_clause_to_clause($1); }
-            | EXPRESSION_TREE_CLAUSE  { $$=expression_tree_clause_to_clause($1); }
-            | TEXT_CLAUSE             { $$=text_clause_to_clause($1); }
+EXPRESSION  : LSCOPE CLAUSE_LIST RSCOPE { $$ = create_expression($2); }
+            ;
+
+CLAUSE_LIST : CLAUSE COMMA CLAUSE_LIST  { $$ = create_clause_list($1, $3); }
+            | CLAUSE                    { $$ = create_clause_list($1, NULL); }
+            ;
+
+CLAUSE      : LEAF_CLAUSE             
+            | COMMENT_CLAUSE         
+            | WHERE_CLAUSE            
+            | EXPRESSION_TREE_CLAUSE  
+            | TEXT_CLAUSE             
             ;
 
 
 /* TEXT CLAUSE SECTION */
 
-TEXT_CLAUSE : LSCOPE TEXT_OPERATOR EQ LSCOPE SEARCH_OPERATOR EQ STRING RSCOPE RSCOPE { $$=create_text_clause($7,false,"",false,false); }
+TEXT_CLAUSE : LSCOPE TEXT_OPERATOR EQ LSCOPE SEARCH_OPERATOR EQ STRING RSCOPE RSCOPE { $$ = create_text_clause($7, false, "", false, false); }
             | LSCOPE TEXT_OPERATOR EQ LSCOPE SEARCH_OPERATOR EQ STRING COMMA
                 LANGUAGE_OPERATOR EQ STRING COMMA
                 CASE_SENSITIVE_OPERATOR EQ BOOLEAN COMMA
-                DIACRITIC_SENSITIVE_OPERATOR EQ BOOLEAN RSCOPE RSCOPE { $$=create_text_clause($7,false,$11,$15,$19); }
+                DIACRITIC_SENSITIVE_OPERATOR EQ BOOLEAN RSCOPE RSCOPE                { $$ = create_text_clause($7, false, $11, $15, $19); }
             ;
 
 /* END OF SECTION */
 
 /*WHERE CLAUSE SECTION*/
                 
-WHERE_CLAUSE :  LSCOPE WHERE_OPERATOR EQ LRBRACKET WHERE_CLAUSE_VALUE RRBRACKET RSCOPE {$$=create_where_clause($2,$5);} ;
+WHERE_CLAUSE : LSCOPE WHERE_OPERATOR EQ LRBRACKET WHERE_CLAUSE_VALUE RRBRACKET RSCOPE { $$ = create_where_clause($2,$5); }
+             ;
 
-WHERE_CLAUSE_VALUE     : STRING {$$=string_to_where_clause_value($1);}
-                     //| FUNCTION
+WHERE_CLAUSE_VALUE     : STRING { $$ = string_to_where_clause_value($1); }
                        ;
 /* END OF SECTION */   
 
 /*COMMENT CLAUSE SECTION*/
-COMMENT_CLAUSE         : LSCOPE COMMENT_OPERATOR EQ STRING RSCOPE { $$=create_comment_clause($2,$4); } ;
+COMMENT_CLAUSE         : LSCOPE COMMENT_OPERATOR EQ STRING RSCOPE { $$ = create_comment_clause($2, $4); }
+                       ;
 /* END OF SECTION */
 
 /*TREE CLAUSE SECTION*/
 
-EXPRESSION_TREE_CLAUSE : LSCOPE TREE_OPERATOR EQ LSQBRACKET EXPRESSION_LIST RSQBRACKET RSCOPE { $$=create_expression_tree_clause($2,$5); } ;
+EXPRESSION_TREE_CLAUSE : TREE_OPERATOR EQ LSQBRACKET EXPRESSION_LIST RSQBRACKET { $$ = create_expression_tree_clause($1, $4); }
+                       | LSCOPE EXPRESSION_TREE_CLAUSE RSCOPE                   { $$ = $2; }
+                       ;
 
-EXPRESSION_LIST        : EXPRESSION                       { $$=create_expression_list( $1, NULL ); };
-                       | EXPRESSION COMMA EXPRESSION_LIST { $$=create_expression_list( $1, $3 ); };
+EXPRESSION_LIST        : EXPRESSION                       { $$ = create_expression_list( $1, NULL ); }
+                       | EXPRESSION COMMA EXPRESSION_LIST { $$ = create_expression_list( $1, $3 ); }
                        ;
 
 TREE_OPERATOR          : OR | AND | NOR ;
@@ -412,66 +882,58 @@ TREE_OPERATOR          : OR | AND | NOR ;
 /* END OF SECTION */
 
 /* LEAF CLAUSE SECTION */
-LEAF_CLAUSE        : KEY EQ VALUE {$$=create_leaf_clause($1, $3);};
-
-KEY                : STRING ;
-
-VALUE              : LEAF_VALUE       {$$=create_leaf_value_value($1);}
-                   | OPEARATOR_OBJECT {$$=create_operator_object_value($1);}
+LEAF_CLAUSE        : KEY EQ VALUE { $$ = create_leaf_clause($1, $3); }
                    ;
 
-OPEARATOR_OBJECT   : LSCOPE OPERATOR_LIST RSCOPE {$$=create_operator_object($2);} ;
-
-OPERATOR_LIST      : OPERATOR                     {$$=create_operator_list($1, NULL);}
-                   | OPERATOR COMMA OPERATOR_LIST {$$=create_operator_list($1,$3);}
+KEY                : STRING
                    ;
 
-OPERATOR           : VALUE_OPERATOR EQ LEAF_VALUE                                  {$$=create_value_operator($1,$3);}
-                   | ARRAY_OPERATOR EQ ARRAY                                       {$$=create_array_operator($1,$3); }
-                   | MOD_OPERATOR EQ LSQBRACKET DIVISOR COMMA REMAINDER RSQBRACKET {$$=create_mod_operator($4,$6); }
-                   | NOT EQ LSCOPE OPERATOR RSCOPE                                 {$$=create_not_operator($4); }
-                   
-                   /*
-                   | ELEMATCH_EXPRESSION_OPERATOR EQ EXPRESSION 
-                   | ELEMATCH_OBJECT_OPERATOR EQ OPEARATOR_OBJECT*/
+VALUE              : LEAF_VALUE       { $$ = create_leaf_value_value($1); }
+                   | OPEARATOR_OBJECT { $$ = create_operator_object_value($1); }
                    ;
 
-VALUE_OPERATOR     : EQ | NOTEQ | LESS | LESSEQ | GREAT | GREATEQ | TYPE | SIZE | EXISTS ;
-
-DIVISOR            : LEAF_VALUE ;
-
-REMAINDER          : LEAF_VALUE ;
-
-ARRAY              : LSQBRACKET LEAF_VALUE_LIST RSQBRACKET {$$=create_array($2); };
-
-ARRAY_OPERATOR     : IN | NIN | ALL ;
-
-LEAF_VALUE_LIST    : LEAF_VALUE                         { $$=create_array_element($1,NULL); }
-                   | LEAF_VALUE COMMA LEAF_VALUE_LIST   { $$=create_array_element($1,$3); }
+OPEARATOR_OBJECT   : LSCOPE OPERATOR_LIST RSCOPE { $$ = create_operator_object($2); }
                    ;
 
-LEAF_VALUE         : INT     { $$=create_integer_value($1); }
-                   | STRING  { $$=create_string_value($1); }
-                   | DOUBLE  { $$=create_double_value($1); }
-                   | ARRAY   { $$=create_array_value($1); }
-                   | BOOLEAN { $$=create_boolean_value($1); }
+OPERATOR_LIST      : OPERATOR                     { $$ = create_operator_list($1, NULL); }
+                   | OPERATOR COMMA OPERATOR_LIST { $$ = create_operator_list($1, $3); }
                    ;
 
-/* END OF SECTION */
+OPERATOR           : VALUE_OPERATOR EQ LEAF_VALUE                                  { $$ = create_value_operator($1, $3); }
+                   | ARRAY_OPERATOR EQ ARRAY                                       { $$ = create_array_operator($1, $3); }
+                   | MOD_OPERATOR EQ LSQBRACKET DIVISOR COMMA REMAINDER RSQBRACKET { $$ = create_mod_operator($4, $6); }
+                   | NOT EQ LSCOPE OPERATOR RSCOPE                                 { $$ = create_not_operator($4); }
+                   ;
 
-/* BSON DOCUMENT STRUCTURE SECTION*/
-/*
-DOCUMENT    : LSCOPE MEMBER_LIST RSCOPE
+VALUE_OPERATOR      : EQ | NOTEQ | LESS | LESSEQ | GREAT | GREATEQ | TYPE | SIZE | EXISTS 
+                    ;
 
-MEMBER_LIST : MEMBER 
-            | MEMBER COMMA MEMBER_LIST
+DIVISOR             : LEAF_VALUE
+                    ;
 
-MEMBER      : KEY EQ LEAF_VALUE
-*/
+REMAINDER           : LEAF_VALUE
+                    ;
+
+ARRAY               : LSQBRACKET LEAF_VALUE_LIST RSQBRACKET {$$ = create_array($2); };
+
+ARRAY_OPERATOR      : IN | NIN | ALL
+                    ;
+
+LEAF_VALUE_LIST     : LEAF_VALUE                         { $$ = create_array_element($1, NULL); }
+                    | LEAF_VALUE COMMA LEAF_VALUE_LIST   { $$ = create_array_element($1, $3); }
+                    ;
+
+LEAF_VALUE          : INT     { $$ = create_integer_value($1); }
+                    | STRING  { $$ = create_string_value($1); }
+                    | DOUBLE  { $$ = create_double_value($1); }
+                    | ARRAY   { $$ = create_array_value($1); }
+                    | BOOLEAN { $$ = create_boolean_value($1); }
+                    ;
+
 /* END OF SECTION */
 
 %%
 
-void main () { yydebug=1; yyparse(); }
+int main () { yydebug=1; yyparse(); return 0;}
 
 int yywrap(void){ return 0; }
