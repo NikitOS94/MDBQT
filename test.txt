@@ -1,6 +1,19 @@
-qw : { $mod : [12,4]}
-{ qty: { $mod: [ 4, 0 ] } }
-{QW : { $lt : 12 },QW : { $lt : 12 }}
+{ qty: { $nin: [ 5, 15 ] } }
+
+{ qty: { $ne: 20 } }
+
+{ qw : { $mod : [ 12, 4 ] } }
+{ qty: { $mod : [ 4, 0 ] } }
+
+{ QW : { $lt : 12, $lt : 1345 } }
+{ QW : { $lt : 12 } }
+
+{ price: { $not: { $gt : 1.99 } } }
+
 { qty: { $in: [ 5, 15 ] }, qtyrt: { $nin: [ 5, 15 ] } }
-{ price: { $not: { $gt: 1.99 } } }
-{qwerty : "sdfsdgdhf sdfsdf",qwertyRRRRRRRRR : "sdfsdgdhf sdfsdf"}
+
+{ { $and: [ { price: { $ne: 1.99 } }, { price: { $exists: false } } ] } }
+
+{ qw : "sdf sdfgkklgdkfmg dhdhfdfjdfj" }
+
+{ { $text: { $search: "coffee" } } }
