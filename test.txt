@@ -1,4 +1,4 @@
-{ qty: { $nin: [ 5, 15 ] ,$in: [ 5, 15 ] } }
+{ qsaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaty: { $nin: [ 55, true ] ,$in: [ 5, 15 ] } }
 
 { qty: { $ne: 25555555555555555555550, $ne: 3444444444444444442222222222222222220, $ne: 40, $ne: 500 } }
 

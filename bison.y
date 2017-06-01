@@ -10,7 +10,7 @@
     void ns_error(char *s) { fprintf (stderr, "\n%s not supported by jsquery \n", s); exit(0);}
     
     _array *
-    create_array(array_element *first_ae) 
+    createArray(array_element *first_ae) 
     {
         _array *new_ar = (_array *) malloc(sizeof(_array));
         new_ar->first_ae = first_ae;
@@ -102,7 +102,7 @@
     }
 
     leaf_value *
-    create_boolean_value(bool b)
+    createBooleanValue(bool b)
     {
       leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
       lv->type = B;
@@ -240,6 +240,59 @@
         return qu;
     }
 
+    char* sconcat(char *form, char *s1, char *s2, int plus) 
+    {
+
+        size_t len1 = strlen(s1);
+        size_t len2 = strlen(s2);                      
+
+        char *result = malloc(len1 + len2 + 1 + plus);
+
+        if (!result) {
+            fprintf(stderr, "malloc() failed: insufficient memory!\n");
+            return NULL;
+        }
+
+        sprintf(result,form,s1,s2);  
+
+        return result;
+    }
+
+    char* sconcat3(char *form, char *s1, char *s2, char *s3, int plus) 
+    {
+
+        size_t len1 = strlen(s1);
+        size_t len2 = strlen(s2); 
+        size_t len3 = strlen(s3);                      
+
+        char *result = malloc(len1 + len2 + len3 + 1 + plus);
+
+        if (!result) {
+            fprintf(stderr, "malloc() failed: insufficient memory!\n");
+            return NULL;
+        }
+
+        sprintf(result, form, s1, s2, s3);  
+
+        return result;
+    }
+
+    char* sconcatsingle(char *form, char *s1, int plus) 
+    {
+
+        size_t len1 = strlen(s1);               
+
+        char *result = malloc(len1 + 1 + plus);
+
+        if (!result) {
+            fprintf(stderr, "malloc() failed: insufficient memory!\n");
+            return NULL;
+        }
+
+        sprintf(result,form,s1);  
+
+        return result;
+    }
 
     char *
     get_value_operator_type(value_operator_type vop_type)
@@ -300,54 +353,32 @@
 
         if(vop->value_op == _EXISTS)
         {
-            if(vop->value->b)
-            {   
-                size_t length = 1+ strlen(key)+strlen(opr)+1;
-                result = (char *) malloc(sizeof(*result) * length);
-                sprintf(result,"%s %s",key,opr);
-            }
-            else
-            {
-                size_t length = 1+ strlen(key)+strlen(opr)+7;
-                result = (char *) malloc(sizeof(*result) * length);
-                sprintf(result,"NOT (%s %s)",key,opr);
-            }
-
-            free(vop);
-            return result;
+            result = vop->value->b ? sconcat("%s %s", key, opr, 1) : sconcat("NOT (%s %s)", key, opr, 7);
+            goto WITHOUT_VALUE;
         }
 
         char *value = get_leaf_value(vop->value);
 
         if(vop->value_op == _TYPE)
         {
-            char *value_type = get_value_type(value);
-            size_t length = strlen(key)+strlen(value_type)+1;
-            result = (char *) malloc(sizeof(*result) * length);
-
-            sprintf(result,"%s %s", key, value_type);
-            free(value_type);
-            free(vop);
-            return result;
+            char *result = sconcat("%s %s", key, get_value_type(value), 1);
+            goto WITHOUT_VALUE;
         }
 
         if(vop->value_op == _NOTEQ)
         {
-            size_t length = 8+strlen(key)+strlen(opr)+strlen(value);
-            char *result = (char*) malloc(sizeof(*result) * length);
+            result = sconcat3("NOT (%s %s %s)", key, opr, value, 8);
+            goto WITH_VALUE;
+        }
 
-            sprintf(result,"NOT (%s %s %s)", key, opr, value);
-            free(vop);
-            free(value);
-            return result;
-       }
-
-        size_t length=strlen(key)+strlen(opr)+strlen(value)+2;
-        result = (char *) malloc(sizeof(*result) * length);
-
-        sprintf(result,"%s %s %s", key, opr, value);
+        result = sconcat3("%s %s %s", key, opr, value, 2);
+        
+        WITH_VALUE:
         free(value);
+
+        WITHOUT_VALUE:
         free(vop);
+   
         return result;
     }
 
@@ -377,38 +408,34 @@
     get_not_operator(char *key, not_operator *op)
     {
         char *oper = get_operator(key,op->op);
-        size_t length = 1+ strlen(oper) + 6;
-        char *result = (char *) malloc(sizeof(*result) * length);
+        char *result = sconcatsingle("NOT (%s)", oper, 6);
 
-        sprintf(result, "NOT (%s)",oper);
         free(op);
         free(oper);
-        return result;
-    }
 
-    void copy_string(char *target, char *source) 
-    {
-       while (*source) {
-          *target = *source;
-          source++;
-          target++;
-       }
-       *target = '\0';
+        return result;
     }
 
     char *
     get_operator_list(char *key, operator_list *op_list)
     {
-        char *result=get_operator(key, op_list->op);
+        char *result = get_operator(key, op_list->op);
         op_list=op_list->next_op;
+
+        if(op_list) result = sconcatsingle("(%s)", result, 2);
+
         while(op_list)
         {
-            char *op = get_operator(key, op_list->op);
-            result=realloc(result,sizeof(char)*(strlen(result)+strlen(op)));
-            strcat(result,op);
-            free(op);
+            char *oprtr = get_operator(key, op_list->op);
+            result = sconcat("%s AND (%s)", result, oprtr, 7);
+
+            free(oprtr);
+
             op_list=op_list->next_op;
         }
+
+        free(key);
+        free(op_list);
 
         return result;
     }
@@ -422,13 +449,9 @@
     char*
     get_leaf_value_eq(char *key, leaf_value *lv)
     {
-        char *leaf_val = get_leaf_value(lv);
-        size_t length = strlen(key) + 3 + strlen(leaf_val);
-        char *result = (char *) malloc(sizeof(*result) * length);
-
-        sprintf(result,"%s = %s",key,leaf_val);
+        char *result = sconcat("%s = %s", key, get_leaf_value(lv), 3);
+        free(lv);
         free(key);
-        free(leaf_val);
 
         return result;
     }
@@ -443,30 +466,28 @@
     get_leaf_clause(leaf_clause *lc)
     {
         char *result = get_leaf_clause_value(lc->key, lc->vl);
-        printf("%s\n", result);
         return result;
     }
 
     char *
     get_expression_list(expression_operator_type exp_op, expression_list* exp_list)
     {         
-        char   *exp = get_expression(exp_list->exp);
+        char   *result = sconcatsingle("(%s)", get_expression(exp_list->exp), 2);
+        char   *oprtr = get_expression_operator(exp_op);
 
-        if(exp_list->next_exp != NULL)
+        exp_list = exp_list->next_exp;
+
+        while(exp_list)
         {
-            char   *next_exp = get_expression_list(exp_op, exp_list->next_exp);
-            char   *op = get_expression_operator(exp_op);
-            size_t  length = 4+strlen(exp)+strlen(op)+strlen(next_exp);
-            char   *result = (char *) malloc(sizeof(*result) * length);
-
-            sprintf(result,"(%s) %s %s",exp,op,next_exp);
-            free(next_exp);
-            free(exp);
-
-            return result;
+            char *exprssn = get_expression(exp_list->exp);
+            result = sconcat3("%s %s (%s)", result, oprtr, exprssn, 4);
+            free(exprssn);
+            exp_list = exp_list->next_exp;
         }
 
-        return exp; 
+        free(exp_list);
+
+        return result; 
     }
 
     char *
@@ -492,11 +513,7 @@
     char *
     get_text_clause(text_clause* t_clause)
     {
-        char   *str=t_clause->search_str;
-        size_t  length=4+strlen(str);
-        char   *result = (char *) malloc(sizeof(*result) * length);
-
-        sprintf(result,"* = %s",str);
+        char   *result = sconcatsingle("* = %s", t_clause->search_str, 4);
         free(t_clause);
 
         return result;
@@ -523,21 +540,17 @@
     char *
     get_clause_list(clause_list *cll)
     {
-        char *cl = get_clause(cll->cl);
-        if(cll->next_cll != NULL)
+        char *result = get_clause(cll->cl);
+        cll=cll->next_cll;
+
+        while(cll)
         {
-            char   *cl_list = get_clause_list(cll->next_cll);
-            size_t  length=strlen(cl)+5+strlen(cl_list);
-            char   *result = (char*) malloc(sizeof(*result) * length);
-
-            sprintf(result,"%s AND %s",cl,cl_list);
-            free(cl);
-            free(cl_list);
-
-            return result;
+            char *cls = get_clause(cll->cl);
+            result = sconcat("%s AND %s", result, cls, 5);
+            cll=cll->next_cll;
         }
 
-        return cl;
+        return result;
     }
 
     char *
@@ -552,11 +565,8 @@
     get_jsquery(query *qu)
     {
         char   *expr=get_expression(qu->exp);
-        size_t  length=2+strlen(expr);
+        char   *result= sconcatsingle("'%s'", expr, 2); 
 
-        char   *result= malloc(sizeof(*result) * length);
-
-        sprintf(result,"'%s'",expr); 
         free(expr);
 
         printf("%s\n", result);
@@ -592,28 +602,31 @@
     char *
     get_array_element(array_element *ae)
     {
-        if(ae->next_ae == NULL)
-            return get_leaf_value(ae->value);
-        else
-        {
-            char   *ar_el = get_leaf_value(ae->value);
-            char   *next_ar_el = get_array_element(ae->next_ae);
-            size_t  length=2+strlen(ar_el)+strlen(next_ar_el);
-            char   *result = (char *) malloc(sizeof(*result) * length);
+        char *str = get_leaf_value(ae->value);
+        ae = ae->next_ae;   
 
-            sprintf(result,"%s, %s",ar_el,next_ar_el);
-            return result;
+        while(ae)
+        {
+            char *ar_element = get_leaf_value(ae->value);
+            str=sconcat("%s, %s",str, ar_element,2);
+
+            free(ar_element);
+            ae = ae->next_ae;
         }
+
+        printf("%s\n", str);
+        return str;
     }
 
     char *
-    get_array(_array * ar)
+    get_array(_array *ar)
     { 
-        char* ar_elements = get_array_element(ar->first_ae);
-        size_t length=2+strlen(ar_elements);
-        char* result = (char *) malloc(sizeof(*result) * length);
-        sprintf(result,"[%s]",ar_elements);
+        char *ar_elements = get_array_element(ar->first_ae);
+        char *result = sconcatsingle("[%s]", ar_elements, 2);
+
         free(ar_elements);
+        free(ar);
+
         return result;
     }
 
@@ -636,27 +649,17 @@
     get_array_operator(char *key, array_operator *aop)
     {        
         char *ar = get_array(aop->ar);
-        char *ar_operator = get_array_operator_type(aop->array_op);
+        char *ar_opr = get_array_operator_type(aop->array_op);
         char *result;
 
         if(aop->array_op == _NIN)
-        {
-            size_t length=8+strlen(key)+strlen(ar_operator)+strlen(ar);
-            result = (char *) malloc(sizeof(*result) * length);
-            sprintf(result,"NOT (%s %s %s)", key, ar_operator, ar);
-            free(ar);
-            free(ar_operator);
-            free(aop);
-            printf("%s\n1", result);
-            return result;
-        }
+            result = sconcat3("NOT (%s %s %s)", key, ar_opr, ar, 8);
+        else
+            result = sconcat3("%s %s %s", key, ar_opr, ar, 2);
 
-        size_t length=2+strlen(key)+strlen(ar_operator)+strlen(ar);
-        result = (char *) malloc(sizeof(*result) * length);
-        sprintf(result,"%s %s %s",key, ar_operator, ar);
         free(ar);
-        free(ar_operator);
         free(aop); 
+
         return result;    
     }
 
@@ -849,7 +852,7 @@ DIVISOR             : LEAF_VALUE
 REMAINDER           : LEAF_VALUE
                     ;
 
-ARRAY               : LSQBRACKET LEAF_VALUE_LIST RSQBRACKET {$$ = create_array($2); };
+ARRAY               : LSQBRACKET LEAF_VALUE_LIST RSQBRACKET {$$ = createArray($2); };
 
 ARRAY_OPERATOR      : IN | NIN | ALL
                     ;
@@ -862,7 +865,7 @@ LEAF_VALUE          : INT     { $$ = create_integer_value($1); }
                     | STRING  { $$ = create_string_value($1); }
                     | DOUBLE  { $$ = create_double_value($1); }
                     | ARRAY   { $$ = create_array_value($1); }
-                    | BOOLEAN { $$ = create_boolean_value($1); }
+                    | BOOLEAN { $$ = createBooleanValue($1); }
                     ;
 
 /* END OF SECTION */
