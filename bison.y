@@ -5,12 +5,6 @@
     #include "structures.h"
     #include "get_query.h"
 
-    #define lr_scope  "( "
-    #define rr_scope  " )"
-    #define ls_scope  "[ "
-    #define rs_scope  " ]"
-    #define select    " SELECT "
-
     void yyerror(char *s) { fprintf (stderr, "%s\n", s); exit(0);}
 
     void ns_error(char *s) { fprintf (stderr, "\n%s not supported by jsquery \n", s); exit(0);}
@@ -250,26 +244,35 @@
     char *
     get_value_operator_type(value_operator_type vop_type)
     {
+        char *op;
         switch(vop_type)
         {
             case _LESS :
-                return "<";
+                op = "<";
+                break;
             case _EQ :
             case _NOTEQ :
-                return "=";
+                op = "=";
+                break;
             case _LESSEQ :
-                return "<=";
+                op = "<=";
+                break;
             case _GREAT :
-                return ">";
+                op = ">";
             case _GREATEQ :
-                return ">=";
+                op = ">=";
+                break;
             case _TYPE :
-                return "";
+                op = "";
+                break;
             case _SIZE :
-                return ".@# =";
+                op = ".@# =";
+                break;
             case _EXISTS :
-                return "= *";
+                op = "= *";
+                break;
         }
+        return op;
     }
     
     char *
@@ -299,24 +302,23 @@
         {
             if(vop->value->b)
             {   
-                size_t length = strlen(key)+strlen(opr)+1;
+                size_t length = 1+ strlen(key)+strlen(opr)+1;
                 result = (char *) malloc(sizeof(*result) * length);
                 sprintf(result,"%s %s",key,opr);
             }
             else
             {
-                size_t length = strlen(key)+strlen(opr)+7;
+                size_t length = 1+ strlen(key)+strlen(opr)+7;
                 result = (char *) malloc(sizeof(*result) * length);
                 sprintf(result,"NOT (%s %s)",key,opr);
             }
 
-            free(opr);
             free(vop);
-            printf("%s\n", result);
             return result;
         }
 
         char *value = get_leaf_value(vop->value);
+
         if(vop->value_op == _TYPE)
         {
             char *value_type = get_value_type(value);
@@ -326,7 +328,6 @@
             sprintf(result,"%s %s", key, value_type);
             free(value_type);
             free(vop);
-            printf("%s\n", result);
             return result;
         }
 
@@ -337,76 +338,78 @@
 
             sprintf(result,"NOT (%s %s %s)", key, opr, value);
             free(vop);
-            free(opr);
             free(value);
-            printf("%s\n", result);
             return result;
-        }
+       }
 
         size_t length=strlen(key)+strlen(opr)+strlen(value)+2;
         result = (char *) malloc(sizeof(*result) * length);
 
         sprintf(result,"%s %s %s", key, opr, value);
-        free(opr);
         free(value);
         free(vop);
-            printf("%s\n", result);
         return result;
     }
 
     char *
     get_operator(char *key, operator *op)
     {
+        char *result;
         switch(op->type)
         {
             case NOP :
-                return get_not_operator(key, (not_operator*) op );
+                result = get_not_operator(key, (not_operator*) op );
+                break;
             case MOP :
                 ns_error("Module operator not suppported by jsquery"); //not supported by jsquery
             case AOP :
-                return get_array_operator(key, (array_operator*) op );
+                result = get_array_operator(key, (array_operator*) op );
+                break;
             case VOP :
-                return get_value_operator(key, (value_operator*) op );
+                result = get_value_operator(key, (value_operator*) op );
+                break;
         }
+        
+        return result;
     }
 
     char * 
     get_not_operator(char *key, not_operator *op)
     {
         char *oper = get_operator(key,op->op);
-        size_t length = strlen(oper) + 6;
+        size_t length = 1+ strlen(oper) + 6;
         char *result = (char *) malloc(sizeof(*result) * length);
 
         sprintf(result, "NOT (%s)",oper);
         free(op);
+        free(oper);
         return result;
+    }
+
+    void copy_string(char *target, char *source) 
+    {
+       while (*source) {
+          *target = *source;
+          source++;
+          target++;
+       }
+       *target = '\0';
     }
 
     char *
     get_operator_list(char *key, operator_list *op_list)
     {
-        operator *opr=op_list->op;
-        char *op = get_operator(key, opr);
-        char *op2 = get_operator(key, op_list->next_op->op);
-        size_t length = strlen(op)+strlen(op2)+1;
-        char *result =(char *) malloc(sizeof(*result) * length);
-        sprintf(result,"%s %s",op,op2);
-        free(op);
-        free(op2);
-        /*
-        if(op_list->next_op != NULL)
+        char *result=get_operator(key, op_list->op);
+        op_list=op_list->next_op;
+        while(op_list)
         {
-            char *op_list_str = get_operator_list(key, op_list->next_op);
-            printf("%s\n qw", op_list_str);
-            size_t length=strlen(op) + 7 + strlen(op_list_str);
-            printf("%d\n qw", length);
-            char *result = (char *) malloc(sizeof(*result) * length);
-           
-            sprintf(result,"(%s) AND %s", opr, op_list_str);
-            
-            return result;
+            char *op = get_operator(key, op_list->op);
+            result=realloc(result,sizeof(char)*(strlen(result)+strlen(op)));
+            strcat(result,op);
+            free(op);
+            op_list=op_list->next_op;
         }
-*/
+
         return result;
     }
 
@@ -458,7 +461,6 @@
 
             sprintf(result,"(%s) %s %s",exp,op,next_exp);
             free(next_exp);
-            free(op);
             free(exp);
 
             return result;
@@ -522,7 +524,6 @@
     get_clause_list(clause_list *cll)
     {
         char *cl = get_clause(cll->cl);
-        printf("%s\n", cll->next_cll);
         if(cll->next_cll != NULL)
         {
             char   *cl_list = get_clause_list(cll->next_cll);
@@ -542,7 +543,8 @@
     char *
     get_expression(expression * ex)
     {
-        return get_clause_list(ex->cll);
+        char *result = get_clause_list(ex->cll);
+        return result;
        
     }
 
@@ -551,11 +553,10 @@
     {
         char   *expr=get_expression(qu->exp);
         size_t  length=2+strlen(expr);
-        printf("%d\n", length);
 
         char   *result= malloc(sizeof(*result) * length);
 
-        sprintf(result,"'%s'",expr); printf("%s\n", expr);
+        sprintf(result,"'%s'",expr); 
         free(expr);
 
         printf("%s\n", result);
@@ -565,19 +566,27 @@
     char *
     get_leaf_value(leaf_value *value)
     {
+        char *val;
         switch(value->type)
         {
             case S :
-                return value->str;
+                val = value->str;
+                break;
             case I :
-                return value->i;
+                val = value->i;
+                break;
             case A :
-                return get_array(value->ar);
+                val = get_array(value->ar);
+                break;
             case B :
-                return (value->b==false ? "false" : "true");
+                val = (value->b==false ? "false" : "true");
+                break;
             case D :
-                return value->d;
+                val = value->d;
+                break;
         }
+
+        return val;
     }
 
     char *
@@ -616,8 +625,10 @@
             case _IN:
             case _NIN:
                 return "<@";
+                break;
             case _ALL:
                 return "&&";
+                break;
         }
     }
 
@@ -636,6 +647,7 @@
             free(ar);
             free(ar_operator);
             free(aop);
+            printf("%s\n1", result);
             return result;
         }
 
@@ -644,7 +656,7 @@
         sprintf(result,"%s %s %s",key, ar_operator, ar);
         free(ar);
         free(ar_operator);
-        free(aop);  
+        free(aop); 
         return result;    
     }
 

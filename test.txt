@@ -1,11 +1,11 @@
-{ qty: { $nin: [ 5, 15 ] } }
+{ qty: { $nin: [ 5, 15 ] ,$in: [ 5, 15 ] } }
 
-{ qty: { $ne: 20 } }
+{ qty: { $ne: 25555555555555555555550, $ne: 3444444444444444442222222222222222220, $ne: 40, $ne: 500 } }
 
 { qw : { $mod : [ 12, 4 ] } }
 { qty: { $mod : [ 4, 0 ] } }
 
-{ QWddddddddddsdfsdfsfsvfsbfsdfbdfgnhnfghgdfsdfsdfdddddd : { $lt : 12323423428462742, $lt : 1323445 } }
+{ QWddddddddddsdfsdfsfsvfsbfsdfbdfgnhnfghgdfsdfsdfdddddd : { $lt : 12323423423423252352523242343223428462742, $lt : 1323445 } }
 { QdfggggggggggggggggggggggdfghdgjfjfggggggggggggggggsdfdsfjjjjjjjjjjjjjjdfgdfgW : { $lt : 12 } }
 
 { prааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа: { $not: { $gt : 1.99 } } }
