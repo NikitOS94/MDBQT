@@ -5,15 +5,16 @@
 { qw : { $mod : [ 12, 4 ] } }
 { qty: { $mod : [ 4, 0 ] } }
 
-{ QW : { $lt : 12, $lt : 1345 } }
-{ QW : { $lt : 12 } }
+{ QWddddddddddsdfsdfsfsvfsbfsdfbdfgnhnfghgdfsdfsdfdddddd : { $lt : 12323423428462742, $lt : 1323445 } }
+{ QdfggggggggggggggggggggggdfghdgjfjfggggggggggggggggsdfdsfjjjjjjjjjjjjjjdfgdfgW : { $lt : 12 } }
 
-{ price: { $not: { $gt : 1.99 } } }
+{ prааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааааа: { $not: { $gt : 1.99 } } }
 
-{ qty: { $in: [ 5, 15 ] }, qtyrt: { $nin: [ 5, 15 ] } }
+{ sdfsdfqty: { $in: [ 345, 13455 ] }, qtyasdfgsdgrt: { $nin: [ 5123123, 15345 ] } }
 
 { { $and: [ { price: { $ne: 1.99 } }, { price: { $exists: false } } ] } }
 
 { qw : "sdf sdfgkklgdkfmg dhdhfdfjdfj" }
 
 { { $text: { $search: "coffee" } } }
+{ { $text: { $search: "bake coffee cake" } } }

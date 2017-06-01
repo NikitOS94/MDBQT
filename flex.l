@@ -55,7 +55,7 @@
 \$mod							{ return MOD_OPERATOR; }
 
 
-([a-zA-Z]*)|(\"[ a-zA-Z]*\")	{yylval.strval=strdup(yytext); return STRING;}	
+([a-zA-Z]*)|(\"[(\\0) a-zA-Z]*\")	{yylval.strval=strdup(yytext); return STRING;}	
 
 [ \t\r\n]      			; // whitespace
 

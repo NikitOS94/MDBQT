@@ -9,11 +9,7 @@
     #define rr_scope  " )"
     #define ls_scope  "[ "
     #define rs_scope  " ]"
-    #define not       "NOT "
-    #define and_op    " AND "
     #define select    " SELECT "
-    #define comma     ","
-    #define any       "*"
 
     void yyerror(char *s) { fprintf (stderr, "%s\n", s); exit(0);}
 
@@ -250,35 +246,6 @@
         return qu;
     }
 
-    char*
-    get_leaf_value_eq(char *key, leaf_value *lv)
-    {
-        static const char eq[] = " = ";
-        char *leaf_val = get_leaf_value(lv);
-
-        char *result = (char *) malloc(sizeof(*result) * (
-                                                    strlen(key)+
-                                                    strlen(eq)+
-                                                    strlen(leaf_val)
-                                              ));
-        strcpy(result, key);
-        strcat(result, eq);
-        strcat(result, leaf_val);
-        printf("%s\n", result);
-        return result;
-    }
-
-    char *
-    get_leaf_clause_value(char* key, value *val)
-    { 
-       switch(val->type)
-        {
-            case LF_VALUE:
-                return get_leaf_value_eq(key, val->lv);
-            case OP_OBJECT:
-                return get_operator_object(key, val->oob);
-        }
-    }
 
     char *
     get_value_operator_type(value_operator_type vop_type)
@@ -286,22 +253,22 @@
         switch(vop_type)
         {
             case _LESS :
-                return " < ";
+                return "<";
             case _EQ :
             case _NOTEQ :
-                return " = ";
+                return "=";
             case _LESSEQ :
-                return " <= ";
+                return "<=";
             case _GREAT :
-                return " > ";
+                return ">";
             case _GREATEQ :
-                return " >= ";
+                return ">=";
             case _TYPE :
                 return "";
             case _SIZE :
-                return ".@# = ";
+                return ".@# =";
             case _EXISTS :
-                return " = *";
+                return "= *";
         }
     }
     
@@ -331,30 +298,21 @@
         if(vop->value_op == _EXISTS)
         {
             if(vop->value->b)
-            {            
-                result = (char *) malloc(sizeof(*result) * (
-                                                                strlen(key)+
-                                                                strlen(opr)
-                                                            ));
-                strcpy(result, key); 
-                strcat(result, opr);
+            {   
+                size_t length = strlen(key)+strlen(opr)+1;
+                result = (char *) malloc(sizeof(*result) * length);
+                sprintf(result,"%s %s",key,opr);
             }
             else
             {
-                result = (char *) malloc(sizeof(*result) * (
-                                                                strlen(not)+
-                                                                strlen(lr_scope)+
-                                                                strlen(key)+
-                                                                strlen(opr)+
-                                                                strlen(rr_scope)
-                                                            ));
-                strcpy(result, not); 
-                strcat(result, lr_scope);
-                strcat(result, key);
-                strcat(result, opr);
-                strcat(result, rr_scope);
+                size_t length = strlen(key)+strlen(opr)+7;
+                result = (char *) malloc(sizeof(*result) * length);
+                sprintf(result,"NOT (%s %s)",key,opr);
             }
 
+            free(opr);
+            free(vop);
+            printf("%s\n", result);
             return result;
         }
 
@@ -362,44 +320,37 @@
         if(vop->value_op == _TYPE)
         {
             char *value_type = get_value_type(value);
-            result = (char *) malloc(sizeof(*result) * (
-                                                strlen(key)+
-                                                strlen(value_type)
-                                              ));
-            strcpy(result, key); 
-            strcat(result, value_type);
+            size_t length = strlen(key)+strlen(value_type)+1;
+            result = (char *) malloc(sizeof(*result) * length);
+
+            sprintf(result,"%s %s", key, value_type);
+            free(value_type);
+            free(vop);
+            printf("%s\n", result);
             return result;
         }
 
         if(vop->value_op == _NOTEQ)
         {
-            result = (char *) malloc(sizeof(*result) * (
-                                                strlen(not)+
-                                                strlen(lr_scope)+
-                                                strlen(key)+
-                                                strlen(opr)+
-                                                strlen(value)+
-                                                strlen(rr_scope)
-                                              ));
-            strcpy(result, not);
-            strcat(result, lr_scope);
-            strcat(result, key); 
-            strcat(result, opr);
-            strcat(result, value);
-            strcat(result, rr_scope);
+            size_t length = 8+strlen(key)+strlen(opr)+strlen(value);
+            char *result = (char*) malloc(sizeof(*result) * length);
 
+            sprintf(result,"NOT (%s %s %s)", key, opr, value);
+            free(vop);
+            free(opr);
+            free(value);
+            printf("%s\n", result);
             return result;
         }
 
-        result = (char *) malloc(sizeof(*result) * (
-                                            strlen(key)+
-                                            strlen(opr)+
-                                            strlen(value)
-                                          ));
-        strcpy(result, key); 
-        strcat(result, opr);
-        strcat(result, value);
+        size_t length=strlen(key)+strlen(opr)+strlen(value)+2;
+        result = (char *) malloc(sizeof(*result) * length);
 
+        sprintf(result,"%s %s %s", key, opr, value);
+        free(opr);
+        free(value);
+        free(vop);
+            printf("%s\n", result);
         return result;
     }
 
@@ -419,98 +370,101 @@
         }
     }
 
-    char* 
+    char * 
     get_not_operator(char *key, not_operator *op)
     {
-        char *oper=get_operator(key,op->op);
-        char *result=(char*) malloc(sizeof(*result) * (
-                                                            strlen(not)+
-                                                            strlen(lr_scope)+
-                                                            strlen(oper)+
-                                                            strlen(rr_scope)   
-                                                       ));
-        strcpy(result, not);
-        strcat(result, lr_scope);
-        strcat(result, oper);
-        strcat(result, rr_scope);
+        char *oper = get_operator(key,op->op);
+        size_t length = strlen(oper) + 6;
+        char *result = (char *) malloc(sizeof(*result) * length);
 
+        sprintf(result, "NOT (%s)",oper);
+        free(op);
         return result;
     }
 
     char *
     get_operator_list(char *key, operator_list *op_list)
     {
-        char *op_str = get_operator(key,op_list->op);  
-        char *oper = (char *) malloc(sizeof(*oper) * (
-                                                        strlen(lr_scope)+
-                                                        strlen(op_str)+
-                                                        strlen(rr_scope)
-                                                     ));
-
-        strcpy(oper, lr_scope);
-        strcat(oper, op_str);
-        strcat(oper, rr_scope);
-        
+        operator *opr=op_list->op;
+        char *op = get_operator(key, opr);
+        char *op2 = get_operator(key, op_list->next_op->op);
+        size_t length = strlen(op)+strlen(op2)+1;
+        char *result =(char *) malloc(sizeof(*result) * length);
+        sprintf(result,"%s %s",op,op2);
+        free(op);
+        free(op2);
+        /*
         if(op_list->next_op != NULL)
         {
-            char *op_list_str = get_operator_list(key,op_list->next_op);
-            char *result = (char *) malloc(sizeof(*result) * (
-                                                                strlen(oper)+
-                                                                strlen(and_op)+
-                                                                strlen(op_list_str)
-                                                             ));
-            strcpy(result, oper);
-            strcat(result, and_op);
-            strcat(result, op_list_str);
-
+            char *op_list_str = get_operator_list(key, op_list->next_op);
+            printf("%s\n qw", op_list_str);
+            size_t length=strlen(op) + 7 + strlen(op_list_str);
+            printf("%d\n qw", length);
+            char *result = (char *) malloc(sizeof(*result) * length);
+           
+            sprintf(result,"(%s) AND %s", opr, op_list_str);
+            
             return result;
         }
-      
-        return oper;
+*/
+        return result;
     }
 
     char *
-    get_operator_object(char *key,operator_object *op_object)
+    get_operator_object(char *key, operator_object *op_object)
     {
         return get_operator_list(key, op_object->ol);
     }
     
+    char*
+    get_leaf_value_eq(char *key, leaf_value *lv)
+    {
+        char *leaf_val = get_leaf_value(lv);
+        size_t length = strlen(key) + 3 + strlen(leaf_val);
+        char *result = (char *) malloc(sizeof(*result) * length);
+
+        sprintf(result,"%s = %s",key,leaf_val);
+        free(key);
+        free(leaf_val);
+
+        return result;
+    }
+
+    char *
+    get_leaf_clause_value(char *key, value *val)
+    { 
+        return (val->type ? get_operator_object(key, val->oob) : get_leaf_value_eq(key, val->lv) );
+    }
+
     char *
     get_leaf_clause(leaf_clause *lc)
     {
-        return get_leaf_clause_value(lc->key, lc->vl);
+        char *result = get_leaf_clause_value(lc->key, lc->vl);
+        printf("%s\n", result);
+        return result;
     }
 
     char *
     get_expression_list(expression_operator_type exp_op, expression_list* exp_list)
     {         
-        char *exp = get_expression(exp_list->exp);
-        char *expr_result = (char *) malloc(sizeof(*expr_result) * (
-                                                                        strlen(lr_scope)+
-                                                                        strlen(exp)+
-                                                                        strlen(rr_scope)
-                                                                    ));
-        strcpy(expr_result, lr_scope);
-        strcat(expr_result, exp);
-        strcat(expr_result, rr_scope);
+        char   *exp = get_expression(exp_list->exp);
 
         if(exp_list->next_exp != NULL)
         {
-            char *next_exp = get_expression_list(exp_op, exp_list->next_exp);
-            char *op = get_expression_operator(exp_op);
-            char *result = (char *) malloc(sizeof(*result) * (
-                                                                strlen(expr_result)+
-                                                                strlen(op)+
-                                                                strlen(next_exp)
-                                                             ));
-            strcpy(result, expr_result);
-            strcat(result, op);
-            strcat(result, next_exp);
+            char   *next_exp = get_expression_list(exp_op, exp_list->next_exp);
+            char   *op = get_expression_operator(exp_op);
+            size_t  length = 4+strlen(exp)+strlen(op)+strlen(next_exp);
+            char   *result = (char *) malloc(sizeof(*result) * length);
+
+            sprintf(result,"(%s) %s %s",exp,op,next_exp);
+            free(next_exp);
+            free(op);
+            free(exp);
 
             return result;
         }
 
-        return expr_result; 
+        return exp; 
     }
 
     char *
@@ -519,11 +473,11 @@
         switch(exp_op)
         {
             case _AND :
-                return " AND ";
+                return "AND";
             case _OR :
-                return " OR ";
+                return "OR";
             case _NOR :
-                return " NOR ";
+                return "NOR";
         }
     }
 
@@ -536,16 +490,12 @@
     char *
     get_text_clause(text_clause* t_clause)
     {
-        static const char eq[] = " = ";
-        char *search_str=t_clause->search_str;
-        char *result=(char *) malloc((*result) * (
-                                                        strlen(any)+
-                                                        strlen(eq)+
-                                                        strlen(search_str)
-                                                 ));
-        strcpy(result, any);
-        strcat(result, eq);
-        strcat(result, search_str);
+        char   *str=t_clause->search_str;
+        size_t  length=4+strlen(str);
+        char   *result = (char *) malloc(sizeof(*result) * length);
+
+        sprintf(result,"* = %s",str);
+        free(t_clause);
 
         return result;
     }
@@ -572,17 +522,16 @@
     get_clause_list(clause_list *cll)
     {
         char *cl = get_clause(cll->cl);
+        printf("%s\n", cll->next_cll);
         if(cll->next_cll != NULL)
         {
-            char *cl_list = get_clause_list(cll->next_cll);
-            char *result = (char*) malloc(sizeof(*result) * (
-                                                                strlen(cl)+
-                                                                strlen(and_op)+
-                                                                strlen(cl_list)
-                                                            ));
-            strcpy(result, cl);
-            strcat(result, and_op);
-            strcat(result, cl_list);
+            char   *cl_list = get_clause_list(cll->next_cll);
+            size_t  length=strlen(cl)+5+strlen(cl_list);
+            char   *result = (char*) malloc(sizeof(*result) * length);
+
+            sprintf(result,"%s AND %s",cl,cl_list);
+            free(cl);
+            free(cl_list);
 
             return result;
         }
@@ -593,29 +542,24 @@
     char *
     get_expression(expression * ex)
     {
-        char *cll = get_clause_list(ex->cll);
-        return cll;
+        return get_clause_list(ex->cll);
+       
     }
 
     char *
     get_jsquery(query *qu)
     {
-        char *expr=get_expression(qu->exp);
-      
-        printf("%s\n", expr);
-      /*
-        static const char quote[]="'";
-        char *result=(char *) malloc(sizeof(*result) * (
-                                                    strlen(quote)+
-                                                    strlen(select)+
-                                                    strlen(quote)
-                                                ));
-        strcpy(result, quote);
-        strcat(result, expr);
-        strcat(result, quote);
+        char   *expr=get_expression(qu->exp);
+        size_t  length=2+strlen(expr);
+        printf("%d\n", length);
+
+        char   *result= malloc(sizeof(*result) * length);
+
+        sprintf(result,"'%s'",expr); printf("%s\n", expr);
+        free(expr);
+
         printf("%s\n", result);
-*/
-        return expr;
+        return result;
     }
 
     char *
@@ -643,17 +587,12 @@
             return get_leaf_value(ae->value);
         else
         {
-            char *value = get_leaf_value(ae->value);
-            char *next_ar_el = get_array_element(ae->next_ae);
-            char *result = (char *) malloc(sizeof(*result) * (
-                                                                strlen(value)+
-                                                                strlen(comma)+
-                                                                strlen(next_ar_el)
-                                                             ));
-            strcpy(result, value);
-            strcat(result, comma);
-            strcat(result, next_ar_el);
+            char   *ar_el = get_leaf_value(ae->value);
+            char   *next_ar_el = get_array_element(ae->next_ae);
+            size_t  length=2+strlen(ar_el)+strlen(next_ar_el);
+            char   *result = (char *) malloc(sizeof(*result) * length);
 
+            sprintf(result,"%s, %s",ar_el,next_ar_el);
             return result;
         }
     }
@@ -662,15 +601,10 @@
     get_array(_array * ar)
     { 
         char* ar_elements = get_array_element(ar->first_ae);
-        char* result = (char *) malloc(sizeof(*result) * (
-                                                    strlen(ls_scope)+
-                                                    strlen(ar_elements)+
-                                                    strlen(rs_scope)
-                                                ));
-        strcpy(result, ls_scope);
-        strcat(result, ar_elements);
-        strcat(result, rs_scope);
-
+        size_t length=2+strlen(ar_elements);
+        char* result = (char *) malloc(sizeof(*result) * length);
+        sprintf(result,"[%s]",ar_elements);
+        free(ar_elements);
         return result;
     }
 
@@ -681,9 +615,9 @@
         {
             case _IN:
             case _NIN:
-                return " <@ ";
+                return "<@";
             case _ALL:
-                return " && ";
+                return "&&";
         }
     }
 
@@ -696,32 +630,21 @@
 
         if(aop->array_op == _NIN)
         {
-            result = (char *) malloc(sizeof(*result) * (
-                                                strlen(not)+
-                                                strlen(lr_scope)+
-                                                strlen(key)+
-                                                strlen(ar_operator)+
-                                                strlen(ar)+
-                                                strlen(rr_scope)
-                                              ));
-            strcpy(result, not);
-            strcat(result, lr_scope);
-            strcat(result, key);
-            strcat(result, ar_operator);
-            strcat(result, ar);
-            strcat(result, rr_scope);
-
+            size_t length=8+strlen(key)+strlen(ar_operator)+strlen(ar);
+            result = (char *) malloc(sizeof(*result) * length);
+            sprintf(result,"NOT (%s %s %s)", key, ar_operator, ar);
+            free(ar);
+            free(ar_operator);
+            free(aop);
             return result;
         }
 
-        result = (char *) malloc(sizeof(*result) * (
-                                            strlen(key)+
-                                            strlen(ar_operator)+
-                                            strlen(ar)
-                                          ));
-        strcpy(result, key);
-        strcat(result, ar_operator);
-        strcat(result, ar);
+        size_t length=2+strlen(key)+strlen(ar_operator)+strlen(ar);
+        result = (char *) malloc(sizeof(*result) * length);
+        sprintf(result,"%s %s %s",key, ar_operator, ar);
+        free(ar);
+        free(ar_operator);
+        free(aop);  
         return result;    
     }
 
