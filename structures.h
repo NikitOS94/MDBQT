@@ -5,11 +5,11 @@
 #include <stdlib.h>
 
 
-    typedef enum bool 
+    typedef enum _bool 
     { 
-        false, 
-        true 
-    } bool;
+        _false, 
+        _true 
+    } _bool;
 
     typedef enum type_of_leaf_value 
     { 
@@ -89,7 +89,7 @@
             char    *str;
             char    *i;
             _array  *ar;
-            bool    b;
+            _bool    b;
             char    *d;
         };
     } leaf_value;
@@ -194,10 +194,10 @@
         type_of_clause            type;
 
         char* search_str;
-        bool lang_op;
+        _bool lang_op;
         char* lang_str;
-        bool case_sense;
-        bool diacr_sense;
+        _bool case_sense;
+        _bool diacr_sense;
     } text_clause;
 
     typedef struct clause
@@ -230,9 +230,9 @@
         expression_list             *exp;
     } expression_clause;
 
-    typedef struct query
+    typedef struct Query
     {
         expression *exp;
-    } query;
+    } Query;
 
 #endif

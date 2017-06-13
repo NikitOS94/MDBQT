@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern char *get_jsquery(query * qu);
+extern char *get_jsquery(Query * qu);
 
 extern char *get_expression(expression * ex);
 

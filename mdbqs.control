@@ -1,0 +1,4 @@
+# mdbqs extension
+comment = 'Support of mongoDB query'
+default_version = '0.1'
+relocatable = true
