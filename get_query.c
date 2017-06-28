@@ -425,7 +425,5 @@ char *
 get_jsquery(MDBQuery *qu)
 {
     char   *expr = get_expression(qu->exp);
-    char   *result = sconcat1("'%s'", expr, 2); 
-  
-    return result;
+    return expr;
 }

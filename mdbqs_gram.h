@@ -82,7 +82,7 @@ typedef union YYSTYPE
 {
 
 /* Line 2068 of yacc.c  */
-#line 37 "mdbqs_gram.y"
+#line 69 "mdbqs_gram.y"
 
     MDBQuery                    *qu;
     expression                  *exp;
