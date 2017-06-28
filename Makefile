@@ -1,5 +1,5 @@
 MODULE_big = mdbqs
-OBJS = mdbqs_gram.o mdbqs_scan.o
+OBJS = mdbqs_gram.o mdbqs_scan.o get_query.o create_query.o
 INCLUDES = structures.h
 INCLUDEDIR = $(shell $(PG_CONFIG) --includedir-server)
 EXTENSION = mdbqs        	# the extensions name

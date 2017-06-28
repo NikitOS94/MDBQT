@@ -3,6 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+extern void nSError(char *s);
+
+extern char* sconcat1(char *form, char *s1, int plus);
+
+extern char* sconcat2(char *form, char *s1, char *s2, int plus);
+
+extern char* sconcat3(char *form, char *s1, char *s2, char *s3, int plus);
+
 extern char *get_jsquery(MDBQuery * qu);
 
 extern char *get_expression(expression * ex);
