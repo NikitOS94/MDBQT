@@ -2,7 +2,7 @@
     #include <stdlib.h>
     #include <stdio.h>
  	#include "structures.h"
-    #include "mdbqs_gram.tab.h"
+    #include "mdbqs_gram.h"
     #include <string.h>
 
 %}

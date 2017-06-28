@@ -2,53 +2,61 @@
     #include <stdlib.h>
     #include <stdio.h>
     #include <string.h>
+
     #include "postgres.h"
     #include "fmgr.h"
+    #include "utils/builtins.h"
+    #include "utils/pg_crc.h"
+    #include "miscadmin.h"
+    #include "utils/jsonb.h"
+    
     #include "structures.h"
     #include "get_query.h"
+    #include "create_query.h"
 
-    #include "utils/builtins.h"
+    #define DatumGetMDBQueryP(d) ((MDBQuery*)DatumGetPointer(PG_DETOAST_DATUM(d)))
+    #define PG_RETURN_MDBQUERY(p) PG_RETURN_POINTER(p)
+    #define PG_GETARG_MDBQUERY(x) DatumGetMDBQueryP(PG_GETARG_DATUM(x))
 
-
-    char *RET;
+    MDBQuery *RET;
 
     typedef struct yy_buffer_state * YY_BUFFER_STATE;
     extern int yyparse();
     extern YY_BUFFER_STATE yy_scan_string(char * str);
     extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
-    extern char *get_leaf_value(leaf_value * value);
-
-    void yyerror(char *s) { 
-    //fprintf (stderr, "%s\n", s); 
-    exit(0);
+    void 
+    yyerror(char *s) 
+    { 
+        //fprintf (stderr, "%s\n", s); 
+        exit(0);
     }
 
-    void nSError(char *s) { //fprintf (stderr, "\n%s not supported by jsquery \n", s); 
-    exit(0);
+    void 
+    nSError(char *s) 
+    { 
+        //fprintf (stderr, "\n%s not supported by jsquery \n", s); 
+        exit(0);
     }
-    
+
     _array *
-    createArray(array_element *first_ae) 
+    createNewArray(List *arrayList) 
     {
-        _array *new_ar = (_array *) malloc(sizeof(_array));
-        new_ar->first_ae = first_ae;
+        _array *new_ar = (_array *) palloc(sizeof(_array));
+        new_ar->arrayList = arrayList;
         return new_ar;
     }
 
-    array_element *
-    createArrayElement(leaf_value * value, array_element *next_ae) 
+    List *
+    addArrayElement(leaf_value * value, List *arrayList) 
     {
-        array_element *new_ae=(array_element *) malloc(sizeof(array_element));
-        new_ae->value = value;
-        new_ae->next_ae = next_ae;
-        return new_ae;
+        return lappend(arrayList, value);
     }
 
     operator *
     createNotOperator(operator *op) 
     {
-        not_operator *new_op = (not_operator *) malloc(sizeof(operator));
+        not_operator *new_op = (not_operator *) palloc(sizeof(operator));
         new_op->type = NOP;
         new_op->op = op;
         return (operator*) new_op;
@@ -57,7 +65,7 @@
     operator *
     createModOperator(leaf_value *divisor, leaf_value *remainder) 
     {
-        mod_operator *new_op = (mod_operator *) malloc(sizeof(mod_operator));
+        mod_operator *new_op = (mod_operator *) palloc(sizeof(mod_operator));
         new_op->type = MOP;
         new_op->divisor = divisor;
         new_op->remainder = remainder;
@@ -67,7 +75,7 @@
     operator *
     createArrayOperator(array_operator_type op, _array *ar) 
     {
-        array_operator *new_op = (array_operator *) malloc(sizeof(array_operator));
+        array_operator *new_op = (array_operator *) palloc(sizeof(array_operator));
         new_op->type = AOP;
         new_op->array_op = op;
         new_op->ar = ar;
@@ -77,7 +85,7 @@
     operator *
     createValueOperator(value_operator_type op, leaf_value * value) 
     {
-        value_operator *new_op = (value_operator *) malloc(sizeof(value_operator));
+        value_operator *new_op = (value_operator *) palloc(sizeof(value_operator));
         new_op->type = VOP;  
         new_op->value_op = op;
         new_op->value = value;
@@ -87,7 +95,7 @@
     leaf_value *
     createStringValue(char *str)
     {
-        leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+        leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
         lv->type = S;
         lv->str = str;
         return lv;
@@ -96,7 +104,7 @@
     leaf_value *
     createDoubleValue(char* d)
     {
-        leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+        leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
         lv->type = D;
         lv->d = d;
         return lv;
@@ -105,7 +113,7 @@
     leaf_value *
     createIntegerValue(char* i)
     {
-        leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+        leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
         lv->type = I;
         lv->i = i;
         return lv;
@@ -114,7 +122,7 @@
     leaf_value *
     createArrayValue(_array *ar)
     {
-      leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+      leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
       lv->type = A;
       lv->ar = ar;
       return lv;
@@ -123,33 +131,30 @@
     leaf_value *
     createBooleanValue(_bool b)
     {
-      leaf_value *lv = (leaf_value *) malloc(sizeof(leaf_value));
+      leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
       lv->type = B;
       lv->b = b;
       return lv;
     }
 
-    operator_list *
-    createOperatorList(operator *op, struct operator_list *ol) 
-    {
-        operator_list *new_ol = (operator_list *) malloc(sizeof(operator_list));
-        new_ol->op = op;
-        new_ol->next_op = ol;      
-        return new_ol;
+    List *
+    addOperator(operator *op, List *operatorList) 
+    {  
+        return lcons(op, operatorList);
     }
 
     operator_object *
-    createOperatorObject(operator_list *ol) 
+    createOperatorObject(List *operatorList) 
     {
-        operator_object *new_oob = (operator_object *) malloc(sizeof(operator_object));
-        new_oob->ol = ol;
+        operator_object *new_oob = (operator_object *) palloc(sizeof(operator_object));
+        new_oob->operatorList = operatorList;
         return new_oob;
     }
 
     value *
     createOperatorObjectValue(operator_object *oob) 
     {
-        value *vl = (value *) malloc(sizeof(value));
+        value *vl = (value *) palloc(sizeof(value));
         vl->type = OP_OBJECT;
         vl->oob = oob;
         return vl;
@@ -158,103 +163,97 @@
     value *
     createLeafValueValue(leaf_value *lv) 
     {
-        value *vl = (value *) malloc(sizeof(value));
+        value *vl = (value *) palloc(sizeof(value));
         vl->type = LF_VALUE;
         vl->lv = lv;
         return vl;
     }
 
-    clause *
+    Clause *
     createLeafClause(char* key, value *vl) 
     {
-        leaf_clause *new_lc = (leaf_clause *) malloc(sizeof(leaf_clause));
+        leaf_clause *new_lc = (leaf_clause *) palloc(sizeof(leaf_clause));
         new_lc->type = LEAF;
         new_lc->key = key;
         new_lc->vl = vl;
-        return ( clause* ) new_lc;
+        return ( Clause* ) new_lc;
     }
 
-    clause *
+    Clause *
     createCommentClause(char *op, char *str) 
     {
-        comment_clause *new_com_cl = (comment_clause *) malloc(sizeof(comment_clause));
+        comment_clause *new_com_cl = (comment_clause *) palloc(sizeof(comment_clause));
         new_com_cl->type = COMMENT;
         new_com_cl->op = op;
         new_com_cl->str = str;
-        return ( clause* ) new_com_cl;
+        return ( Clause* ) new_com_cl;
     }
 
     where_clause_value *
     stringToWhereClauseValue(char *str)
     {
-        where_clause_value *wcv = (where_clause_value *) malloc(sizeof(where_clause_value));
+        where_clause_value *wcv = (where_clause_value *) palloc(sizeof(where_clause_value));
         wcv->str = str;   
         return wcv;
     }
 
-    clause *
+    Clause *
     createWhereClause(char *op, where_clause_value *wcv)
     {
-        where_clause *wc = (where_clause *) malloc(sizeof(where_clause));
+        where_clause *wc = (where_clause *) palloc(sizeof(where_clause));
         wc->type = WHERE;
         wc->op = op;
         wc->wcv = wcv;
-        return (clause *) wc;
+        return (Clause *) wc;
     }
 
-    clause_list *
-    createClauseList(clause *cl,clause_list *next_cll)
+    List *
+    addClause(Clause *clause, List *clauseList)
     {
-        clause_list *cll = (clause_list *) malloc(sizeof(clause_list));
-        cll->cl = cl;
-        cll->next_cll = next_cll;
-        return cll;
+        return lappend(clauseList, clause);
     }
 
     expression *
-    createExpression(clause_list *cll)
+    createExpression(List *clauseList)
     {
-        expression *exp = (expression *) malloc(sizeof(expression));
-        exp->cll = cll;
+        expression *exp = (expression *) palloc(sizeof(expression));
+        exp->clauseList = clauseList;
         return exp;
     }
 
-    expression_list *
-    createExpressionList(expression *exp, expression_list *next_exp)
+    List *
+    addExpression(expression *exp, List *expressionList)
     {
-        expression_list *exp_list = (expression_list *) malloc(sizeof(expression_list));
-        exp_list->exp = exp;
-        exp_list->next_exp = next_exp;
-        return exp_list;
+        return lcons(exp, expressionList);
     }
 
-    clause *
-    createExpressionTreeClause(expression_operator_type op, expression_list *exp)
+    Clause *
+    createExpressionTreeClause(expression_operator_type op, List *expressionList)
     {
-        expression_clause *exp_cl = (expression_clause *) malloc(sizeof(expression_clause));
+        expression_clause *exp_cl = (expression_clause *) palloc(sizeof(expression_clause));
         exp_cl->type = EXPRESSION;
         exp_cl->op = op;
-        exp_cl->exp = exp;
-        return (clause *) exp_cl;
+        exp_cl->expressionList = expressionList;
+        return (Clause *) exp_cl;
     }
 
-    clause *
+    Clause *
     createTextClause(char* search_str, _bool lang_op, char* lang_str, _bool case_sense, _bool diacr_sense)
     {
-        text_clause *text_cl = (text_clause *) malloc(sizeof(text_clause));
+        text_clause *text_cl = (text_clause *) palloc(sizeof(text_clause));
         text_cl->type = TEXT;
         text_cl->search_str = search_str;
         text_cl->lang_op = lang_op;
         text_cl->lang_str = lang_str;
         text_cl->case_sense = case_sense;
         text_cl->diacr_sense = diacr_sense;
-        return (clause *) text_cl;
+        return (Clause *) text_cl;
     }
 
-    Query *
+    MDBQuery *
     createQuery(expression *exp)
     {
-        Query *qu = (Query *) malloc(sizeof(Query));
+        MDBQuery *qu = (MDBQuery *) palloc(sizeof(MDBQuery));
         qu->exp = exp;
         return qu;
     }
@@ -265,7 +264,7 @@
         size_t len1 = strlen(s1);
         size_t len2 = strlen(s2);                      
 
-        char *result = malloc(len1 + len2 + 1 + plus);
+        char *result = palloc(len1 + len2 + 1 + plus);
 
         if (!result) {
            // fprintf(stderr, "malloc() failed: insufficient memory!\n");
@@ -284,7 +283,7 @@
         size_t len2 = strlen(s2); 
         size_t len3 = strlen(s3);                      
 
-        char *result = malloc(len1 + len2 + len3 + 1 + plus);
+        char *result = palloc(len1 + len2 + len3 + 1 + plus);
 
         if (!result) {
          //   fprintf(stderr, "malloc() failed: insufficient memory!\n");
@@ -301,7 +300,7 @@
 
         size_t len1 = strlen(s1);               
 
-        char *result = malloc(len1 + 1 + plus);
+        char *result = palloc(len1 + 1 + plus);
 
         if (!result) {
           //  fprintf(stderr, "malloc() failed: insufficient memory!\n");
@@ -380,7 +379,7 @@
 
         if(vop->value_op == _TYPE)
         {
-            char *result = sconcat("%s %s", key, get_value_type(value), 1);
+            result = sconcat("%s %s", key, get_value_type(value), 1);
             goto WITHOUT_VALUE;
         }
 
@@ -396,7 +395,7 @@
         free(value);
 
         WITHOUT_VALUE:
-        free(vop);
+        pfree(vop);
    
         return result;
     }
@@ -429,32 +428,7 @@
         char *oper = get_operator(key,op->op);
         char *result = sconcatsingle("NOT (%s)", oper, 6);
 
-        free(op);
-        free(oper);
-
-        return result;
-    }
-
-    char *
-    get_operator_list(char *key, operator_list *op_list)
-    {
-        char *result = get_operator(key, op_list->op);
-        op_list=op_list->next_op;
-
-        if(op_list) result = sconcatsingle("(%s)", result, 2);
-
-        while(op_list)
-        {
-            char *oprtr = get_operator(key, op_list->op);
-            result = sconcat("%s AND (%s)", result, oprtr, 7);
-
-            free(oprtr);
-
-            op_list=op_list->next_op;
-        }
-
-        free(key);
-        free(op_list);
+        pfree(op);
 
         return result;
     }
@@ -462,15 +436,36 @@
     char *
     get_operator_object(char *key, operator_object *op_object)
     {
-        return get_operator_list(key, op_object->ol);
+        char *str;
+        char *buff="";
+
+        ListCell *cell;
+        List *operatorList = op_object->operatorList;
+
+        buff = get_operator(key, ((operator *)list_nth(operatorList, 0))); 
+
+        if(length(operatorList)>1)
+        {
+            buff = sconcatsingle("(%s)", buff, 2);
+            list_delete_first(operatorList);
+            foreach(cell, operatorList)
+            {
+                str = get_operator(key, ((operator *)lfirst(cell)));
+                buff = sconcat("%s AND (%s)", buff, str, 7);
+            }
+        }
+           
+        pfree(operatorList);
+        pfree(op_object);
+
+        return buff;
     }
     
     char*
     get_leaf_value_eq(char *key, leaf_value *lv)
     {
         char *result = sconcat("%s = %s", key, get_leaf_value(lv), 3);
-        free(lv);
-        free(key);
+        pfree(lv);
 
         return result;
     }
@@ -485,28 +480,8 @@
     get_leaf_clause(leaf_clause *lc)
     {
         char *result = get_leaf_clause_value(lc->key, lc->vl);
+        pfree(lc);
         return result;
-    }
-
-    char *
-    get_expression_list(expression_operator_type exp_op, expression_list* exp_list)
-    {         
-        char   *result = sconcatsingle("(%s)", get_expression(exp_list->exp), 2);
-        char   *oprtr = get_expression_operator(exp_op);
-
-        exp_list = exp_list->next_exp;
-
-        while(exp_list)
-        {
-            char *exprssn = get_expression(exp_list->exp);
-            result = sconcat3("%s %s (%s)", result, oprtr, exprssn, 4);
-            free(exprssn);
-            exp_list = exp_list->next_exp;
-        }
-
-        free(exp_list);
-
-        return result; 
     }
 
     char *
@@ -526,20 +501,43 @@
     char *
     get_expression_clause(expression_clause* exp_clause)
     {
-        return get_expression_list(exp_clause->op, exp_clause->exp);
+        char *str;
+        char *buff="";
+
+        List *expressionList = exp_clause->expressionList;
+        ListCell *cell;
+
+        buff = get_expression((expression *)list_nth(expressionList,0)); 
+        if(length(expressionList)>1)
+        {
+            buff = sconcatsingle("(%s)", buff, 2);
+            list_delete_first(expressionList);
+            char   *expOperator = get_expression_operator(exp_clause->op);
+
+            foreach(cell, expressionList)
+            {
+                str = get_expression((expression *)lfirst(cell));
+                buff = sconcat3("%s %s (%s)", buff, expOperator, str, 4);
+            }   
+        }
+
+        pfree(expressionList);
+        pfree(exp_clause);
+
+        return buff;
     }
 
     char *
     get_text_clause(text_clause* t_clause)
     {
         char   *result = sconcatsingle("* = %s", t_clause->search_str, 4);
-        free(t_clause);
+        pfree(t_clause);
 
         return result;
     }
 
     char *
-    get_clause(clause *cl)
+    get_clause(Clause *cl)
     {  
         switch(cl->type)
         {
@@ -557,37 +555,34 @@
     }
 
     char *
-    get_clause_list(clause_list *cll)
-    {
-        char *result = get_clause(cll->cl);
-        cll=cll->next_cll;
-
-        while(cll)
-        {
-            char *cls = get_clause(cll->cl);
-            result = sconcat("%s AND %s", result, cls, 5);
-            cll=cll->next_cll;
-        }
-
-        return result;
-    }
-
-    char *
     get_expression(expression * ex)
     {
-        char *result = get_clause_list(ex->cll);
-        return result;
-       
+        char *str;
+        char *buff="";
+
+        List *clauseList = ex->clauseList;
+        ListCell *cell;
+
+        buff = get_clause((Clause *)list_nth(clauseList,0)); 
+        list_delete_first(clauseList);
+
+        if(length(clauseList)>1)
+            foreach(cell, clauseList)
+            {
+                str = get_clause((Clause *)lfirst(cell));
+                buff = sconcat("%s AND %s", buff, str, 5);
+            }
+        
+        pfree(ex);
+
+        return buff;
     }
 
     char *
-    get_jsquery(Query *qu)
+    get_jsquery(MDBQuery *qu)
     {
-        char   *expr=get_expression(qu->exp);
-        char   *result= sconcatsingle("'%s'", expr, 2); 
-
-        free(expr);
-
+        char   *expr = get_expression(qu->exp);
+        char   *result = sconcatsingle("'%s'", expr, 2); 
       
         return result;
     }
@@ -619,34 +614,27 @@
     }
 
     char *
-    get_array_element(array_element *ae)
-    {
-        char *str = get_leaf_value(ae->value);
-        ae = ae->next_ae;   
-
-        while(ae)
-        {
-            char *ar_element = get_leaf_value(ae->value);
-            str=sconcat("%s, %s",str, ar_element,2);
-
-            free(ar_element);
-            ae = ae->next_ae;
-        }
-
-        printf("%s\n", str);
-        return str;
-    }
-
-    char *
     get_array(_array *ar)
     { 
-        char *ar_elements = get_array_element(ar->first_ae);
-        char *result = sconcatsingle("[%s]", ar_elements, 2);
+        char *str;
+        char *buff="";
 
-        free(ar_elements);
-        free(ar);
+        List *arrayList = ar->arrayList;
+        ListCell *cell;
 
-        return result;
+        buff = get_leaf_value((leaf_value *)list_nth(arrayList, 0)); 
+        list_delete_first(arrayList);
+
+        foreach(cell, arrayList)
+        {
+            str = get_leaf_value((leaf_value *)lfirst(cell));
+            buff = sconcat("%s, %s", str, buff, 2);
+        }
+
+        pfree(arrayList);
+        pfree(ar);
+
+        return sconcatsingle("[%s]", buff, 2);
     }
 
     char *
@@ -676,61 +664,51 @@
         else
             result = sconcat3("%s %s %s", key, ar_opr, ar, 2);
 
-        free(ar);
-        free(aop); 
+        pfree(aop); 
 
         return result;    
     }
-
-
-
 %}
 
-%union {
+%union 
+{
+    MDBQuery                    *qu;
+    expression                  *exp;
+   
+    Clause                      *cl;
+    value                       *vl;
+    leaf_value                  *lv;
 
-    Query             *qu;
-    expression        *exp;
-    clause_list       *cll;
-    clause            *cl;
-    expression_list   *exp_list;
-    value             *vl;
-    leaf_value        *lv;
+    List                        *list;
 
-    where_clause_value *wcv;
+    where_clause_value          *wcv;
 
-    char *            strval;
-    int               intval;
-    double            dubval;
-    _array            *arrval;
-    _bool              boolval;
+    char                        *strval;
+    int                          intval;
+    double                       dubval;
+    _array                      *arrval;
+    _bool                        boolval;
     
-    array_operator_type         aop_type;
-    expression_operator_type    exop_type;
-    value_operator_type         valop_type;
+    array_operator_type          aop_type;
+    expression_operator_type     exop_type;
+    value_operator_type          valop_type;
 
-    operator_object   *oob;
-    operator_list     *ol;
-    operator          *op;
-
-    array_element     *ae;
+    operator_object             *oob;
+    operator                    *op;
 }
 
 %type<qu>         QUERY
 %type<exp>        EXPRESSION
-%type<cll>        CLAUSE_LIST
 %type<cl>         CLAUSE TEXT_CLAUSE EXPRESSION_TREE_CLAUSE LEAF_CLAUSE COMMENT_CLAUSE WHERE_CLAUSE
-%type<vl>         VALUE
-
-%type<exp_list>   EXPRESSION_LIST
+%type<vl>         VALUE 
 
 %type<strval>     KEY 
 %type<op>         OPERATOR
 %type<oob>        OPEARATOR_OBJECT
-%type<ol>         OPERATOR_LIST
 
 %type<strval>     LSCOPE RSCOPE COMMA
     
-%type<ae>         LEAF_VALUE_LIST
+%type<list>       OPERATOR_LIST LEAF_VALUE_LIST EXPRESSION_LIST CLAUSE_LIST
 
 %type<wcv>        WHERE_CLAUSE_VALUE
 %type<strval>     WHERE_OPERATOR
@@ -781,14 +759,14 @@
 
 %%
 
-QUERY       : EXPRESSION {$$ = createQuery($1); RET=get_jsquery($$); }
+QUERY       : EXPRESSION {$$ = createQuery($1); RET=$$; }
             ;
 
 EXPRESSION  : LSCOPE CLAUSE_LIST RSCOPE { $$ = createExpression($2); }
             ;
 
-CLAUSE_LIST : CLAUSE COMMA CLAUSE_LIST  { $$ = createClauseList($1, $3); }
-            | CLAUSE                    { $$ = createClauseList($1, NULL); }
+CLAUSE_LIST : CLAUSE COMMA CLAUSE_LIST  { $$ = addClause($1, $3); }
+            | CLAUSE                    { $$ = lappend(NULL, $1); }
             ;
 
 CLAUSE      : LEAF_CLAUSE             
@@ -830,8 +808,8 @@ EXPRESSION_TREE_CLAUSE : TREE_OPERATOR EQ LSQBRACKET EXPRESSION_LIST RSQBRACKET 
                        | LSCOPE EXPRESSION_TREE_CLAUSE RSCOPE                   { $$ = $2; }
                        ;
 
-EXPRESSION_LIST        : EXPRESSION                       { $$ = createExpressionList( $1, NULL ); }
-                       | EXPRESSION COMMA EXPRESSION_LIST { $$ = createExpressionList( $1, $3 ); }
+EXPRESSION_LIST        : EXPRESSION                       { $$ = lcons($1, NULL); }
+                       | EXPRESSION COMMA EXPRESSION_LIST { $$ = addExpression($1, $3); }
                        ;
 
 TREE_OPERATOR          : OR | AND | NOR ;
@@ -852,8 +830,8 @@ VALUE              : LEAF_VALUE       { $$ = createLeafValueValue($1); }
 OPEARATOR_OBJECT   : LSCOPE OPERATOR_LIST RSCOPE { $$ = createOperatorObject($2); }
                    ;
 
-OPERATOR_LIST      : OPERATOR                     { $$ = createOperatorList($1, NULL); }
-                   | OPERATOR COMMA OPERATOR_LIST { $$ = createOperatorList($1, $3); }
+OPERATOR_LIST      : OPERATOR                     { $$ = lappend(NULL, $1); }
+                   | OPERATOR COMMA OPERATOR_LIST { $$ = addOperator($1, $3); }
                    ;
 
 OPERATOR           : VALUE_OPERATOR EQ LEAF_VALUE                                  { $$ = createValueOperator($1, $3); }
@@ -871,19 +849,19 @@ DIVISOR             : LEAF_VALUE
 REMAINDER           : LEAF_VALUE
                     ;
 
-ARRAY               : LSQBRACKET LEAF_VALUE_LIST RSQBRACKET {$$ = createArray($2); };
+ARRAY               : LSQBRACKET LEAF_VALUE_LIST RSQBRACKET {$$ = createNewArray($2); };
 
 ARRAY_OPERATOR      : __IN | NIN | ALL
                     ;
 
-LEAF_VALUE_LIST     : LEAF_VALUE                         { $$ = createArrayElement($1, NULL); }
-                    | LEAF_VALUE COMMA LEAF_VALUE_LIST   { $$ = createArrayElement($1, $3); }
+LEAF_VALUE_LIST     : LEAF_VALUE                         { $$ = lcons($1, NULL); }
+                    | LEAF_VALUE COMMA LEAF_VALUE_LIST   { $$ = addArrayElement($1, $3); }
                     ;
 
-LEAF_VALUE          : _INT     { $$ = createIntegerValue($1); }
-                    | STRING  { $$ = createStringValue($1); }
+LEAF_VALUE          : _INT      { $$ = createIntegerValue($1); }
+                    | STRING    { $$ = createStringValue($1); }
                     | __DOUBLE  { $$ = createDoubleValue($1); }
-                    | ARRAY   { $$ = createArrayValue($1); }
+                    | ARRAY     { $$ = createArrayValue($1); }
                     | __BOOLEAN { $$ = createBooleanValue($1); }
                     ;
 
@@ -892,22 +870,67 @@ LEAF_VALUE          : _INT     { $$ = createIntegerValue($1); }
 %%
 
 
-    PG_MODULE_MAGIC;
+PG_MODULE_MAGIC;
 
-    PG_FUNCTION_INFO_V1(start_parse2);
-    Datum
-    start_parse2(PG_FUNCTION_ARGS)
-    {
+PG_FUNCTION_INFO_V1(mdbquery_in);
+Datum
+mdbquery_in(PG_FUNCTION_ARGS)
+{
     char *input=PG_GETARG_CSTRING(0);
     YY_BUFFER_STATE buffer = yy_scan_string(input);
+    
     yyparse();
     yy_delete_buffer(buffer);
        
-       PG_RETURN_TEXT_P(cstring_to_text(RET));
-    }
+    PG_RETURN_MDBQUERY(RET);
+}
 
+PG_FUNCTION_INFO_V1(mdbquery_q);
+Datum
+mdbquery_q(PG_FUNCTION_ARGS)
+{
+    char *input=PG_GETARG_CSTRING(0);
+    YY_BUFFER_STATE buffer = yy_scan_string(input);
+    
+    yyparse();
+    yy_delete_buffer(buffer);
+       
+    PG_RETURN_CSTRING(get_jsquery(RET));
+}
 
+PG_FUNCTION_INFO_V1(mdbquery_out);
+Datum
+mdbquery_out(PG_FUNCTION_ARGS)
+{
+    MDBQuery *input=PG_GETARG_MDBQUERY(0);
+       
+    PG_RETURN_CSTRING(get_jsquery(input));
+}
 
+PG_FUNCTION_INFO_V1(json_mdbquery_exec);
+Datum
+json_mdbquery_exec(PG_FUNCTION_ARGS)
+{
+    Jsonb           *jb = PG_GETARG_JSONB(0);
+    MDBQuery        *mq = PG_GETARG_MDBQUERY(1);
 
+    PG_FREE_IF_COPY(jb, 0);
+    PG_FREE_IF_COPY(mq, 1);
+
+    PG_RETURN_BOOL(true);
+}
+
+PG_FUNCTION_INFO_V1(mdbquery_json_exec);
+Datum
+mdbquery_json_exec(PG_FUNCTION_ARGS)
+{
+    MDBQuery        *mq = PG_GETARG_MDBQUERY(0);
+    Jsonb           *jb = PG_GETARG_JSONB(1);
+
+    PG_FREE_IF_COPY(mq, 0);
+    PG_FREE_IF_COPY(jb, 1);
+
+    PG_RETURN_BOOL(false);
+}
 
 int yywrap(void){ return 0; }

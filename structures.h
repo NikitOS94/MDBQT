@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "postgres.h"
 
     typedef enum _bool 
     { 
@@ -78,7 +79,7 @@
 
     typedef struct _array
     {
-        struct array_element *first_ae;
+    	List 	*arrayList;
     } _array;
 
     typedef struct leaf_value
@@ -93,12 +94,6 @@
             char    *d;
         };
     } leaf_value;
-
-    typedef struct array_element
-    {
-        leaf_value           *value;
-        struct array_element *next_ae;
-    } array_element;
 
     /* Operators */
     typedef struct value_operator
@@ -145,7 +140,7 @@
 
     typedef struct operator_object
     {
-        operator_list *ol;
+        List *operatorList;
     } operator_object;
 
     typedef struct value
@@ -200,39 +195,27 @@
         _bool diacr_sense;
     } text_clause;
 
-    typedef struct clause
+    typedef struct Clause
     {
         type_of_clause            type;
-    } clause;
-
-    typedef struct clause_list
-    {
-        clause              *cl;
-        struct clause_list  *next_cll;
-    } clause_list;
+    } Clause;
 
     typedef struct expression
     {
-        clause_list *cll;
+        List  				*clauseList;
     } expression;
-
-    typedef struct expression_list
-    {
-        expression              *exp;
-        struct expression_list  *next_exp;
-    } expression_list;
 
     typedef struct expression_clause
     {
-        type_of_clause              type;
+        type_of_clause               type;
 
-        expression_operator_type    op;
-        expression_list             *exp;
+        expression_operator_type     op;
+        List             			*expressionList;
     } expression_clause;
 
-    typedef struct Query
+    typedef struct MDBQuery
     {
         expression *exp;
-    } Query;
+    } MDBQuery;
 
 #endif
