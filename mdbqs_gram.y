@@ -45,6 +45,7 @@
     #include "structures.h"
     #include "get_query.h"
     #include "create_query.h"
+    #include "jsquery_calls.h"
 
     #define DatumGetMDBQueryP(d) ((MDBQuery*)DatumGetPointer(PG_DETOAST_DATUM(d)))
     #define PG_RETURN_MDBQUERY(p) PG_RETURN_POINTER(p)
@@ -262,40 +263,6 @@ LEAF_VALUE          : _INT      { $$ = createIntegerValue($1); }
 /* END OF SECTION */
 %%
 
-static Oid
-get_extension_schema(Oid ext_oid)
-{
-    Oid         result;
-    Relation    rel;
-    SysScanDesc scandesc;
-    HeapTuple   tuple;
-    ScanKeyData entry[1];
-
-    rel = heap_open(ExtensionRelationId, AccessShareLock);
-
-    ScanKeyInit(&entry[0],
-                ObjectIdAttributeNumber,
-                BTEqualStrategyNumber, F_OIDEQ,
-                ObjectIdGetDatum(ext_oid));
-
-    scandesc = systable_beginscan(rel, ExtensionOidIndexId, true,
-                                  NULL, 1, entry);
-
-    tuple = systable_getnext(scandesc);
-
-    /* We assume that there can be at most one matching tuple */
-    if (HeapTupleIsValid(tuple))
-        result = ((Form_pg_extension) GETSTRUCT(tuple))->extnamespace;
-    else
-        result = InvalidOid;
-
-    systable_endscan(scandesc);
-
-    heap_close(rel, AccessShareLock);
-
-    return result;
-}
-
 PG_MODULE_MAGIC;
 
 PG_FUNCTION_INFO_V1(mdbquery_in);
@@ -311,123 +278,45 @@ mdbquery_in(PG_FUNCTION_ARGS)
     PG_RETURN_MDBQUERY(RET);
 }
 
-Datum
-callJsquery_in(char *query)
-{
-    const char *EXTENSION_NAME = "jsquery";
-    const char *FUNCTION_NAME = "jsquery_in";
-    const char *JSQUERY_QUERY = query;
-
-    Oid extensionOid;
-    Oid shemaOid;
-    Oid functionOid;
-    Oid jsqueryOid;
-    List *funcname;
-    FmgrInfo *procedure = palloc0(sizeof(FmgrInfo));
-    Oid funcargtypes[1];
-
-    funcargtypes[0] = CSTRINGOID;
-
- //   jsqueryOid = LookupTypeNameOid(NULL, EXTENSION_NAME, true);
-    extensionOid = get_extension_oid(EXTENSION_NAME, false);
-    shemaOid = get_extension_schema(extensionOid);
-
-    funcname = list_make2(makeString(get_namespace_name(shemaOid)), makeString(FUNCTION_NAME));
-    functionOid = LookupFuncName(funcname, 1, funcargtypes, false);
-
-    if (OidIsValid(functionOid))
-    {
-        fmgr_info(functionOid, procedure); 
-        return FunctionCall1(procedure, JSQUERY_QUERY);
-    }
-
-    return NULL;
-}
-
-char *
-callJsquery_out(Datum *jsquery_query)
-{
-    const char *EXTENSION_NAME = "jsquery";
-    const char *FUNCTION_NAME = "jsquery_out";
-
-    Oid extensionOid;
-    Oid shemaOid;
-    Oid functionOid;
-    Oid jsqueryOid;
-    List *funcname;
-    FmgrInfo *procedure = palloc0(sizeof(FmgrInfo));
-    Oid funcargtypes[1];
-
-    funcargtypes[0] = CSTRINGOID;
-
- //   jsqueryOid = LookupTypeNameOid(NULL, EXTENSION_NAME, true);
-    extensionOid = get_extension_oid(EXTENSION_NAME, false);
-    shemaOid = get_extension_schema(extensionOid);
-
-    funcname = list_make2(makeString(get_namespace_name(shemaOid)), makeString(FUNCTION_NAME));
-    functionOid = LookupFuncName(funcname, 1, funcargtypes, false);
-
-    if (OidIsValid(functionOid))
-    {
-        fmgr_info(functionOid, procedure); 
-        return FunctionCall1(procedure, jsquery_query);
-    }
-
-    return NULL;
-}
-
-PG_FUNCTION_INFO_V1(mdbquery_q);
-Datum
-mdbquery_q(PG_FUNCTION_ARGS)
-{
-    char *input=PG_GETARG_CSTRING(0);
-    YY_BUFFER_STATE buffer = yy_scan_string(input);
-    
-    yyparse();
-    yy_delete_buffer(buffer);
-
-    const char *EXTENSION_NAME = "jsquery";
-    const char *FUNCTION_NAME = "jsquery_in";
-    const char *JSQUERY_QUERY = get_jsquery(RET);
-
-    Datum js_query = callJsquery_in(JSQUERY_QUERY);
-    
-    PG_RETURN_CSTRING(JSQUERY_QUERY);       
-}
-
 PG_FUNCTION_INFO_V1(mdbquery_out);
 Datum
 mdbquery_out(PG_FUNCTION_ARGS)
 {
-    MDBQuery *input=PG_GETARG_MDBQUERY(0);
-       
-    PG_RETURN_CSTRING(get_jsquery(input));
+    MDBQuery    *input=PG_GETARG_MDBQUERY(0);
+    const char  *JSQUERY_QUERY = get_jsquery(input);
+    Datum        jsquery_object = callJsquery_in(JSQUERY_QUERY);
+
+    PG_RETURN_CSTRING(callJsquery_out(jsquery_object));
 }
 
 PG_FUNCTION_INFO_V1(json_mdbquery_exec);
 Datum
 json_mdbquery_exec(PG_FUNCTION_ARGS)
 {
-    Jsonb           *jb = PG_GETARG_JSONB(0);
-    MDBQuery        *mq = PG_GETARG_MDBQUERY(1);
+    Jsonb       *jb = PG_GETARG_JSONB(0);
+    MDBQuery    *mq = PG_GETARG_MDBQUERY(1);
+    const char  *JSQUERY_QUERY = get_jsquery(mq);
+    Datum        js_query = callJsquery_in(JSQUERY_QUERY);
 
     PG_FREE_IF_COPY(jb, 0);
     PG_FREE_IF_COPY(mq, 1);
 
-    PG_RETURN_BOOL(true);
+    return callJsquery_jsonb_exec(jb, js_query);
 }
 
 PG_FUNCTION_INFO_V1(mdbquery_json_exec);
 Datum
 mdbquery_json_exec(PG_FUNCTION_ARGS)
 {
-    MDBQuery        *mq = PG_GETARG_MDBQUERY(0);
-    Jsonb           *jb = PG_GETARG_JSONB(1);
+    MDBQuery    *mq = PG_GETARG_MDBQUERY(0);
+    Jsonb       *jb = PG_GETARG_JSONB(1);
+    const char  *JSQUERY_QUERY = get_jsquery(mq);
+    Datum        js_query = callJsquery_in(JSQUERY_QUERY);
 
     PG_FREE_IF_COPY(mq, 0);
     PG_FREE_IF_COPY(jb, 1);
 
-    PG_RETURN_BOOL(false);
+    return callJsquery_jsonb_exec(jb, js_query);
 }
 
 int yywrap(void){ return 0; }

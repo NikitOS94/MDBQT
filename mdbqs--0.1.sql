@@ -10,10 +10,6 @@ CREATE FUNCTION mdbquery_out(mdbquery) RETURNS cstring
 AS '$libdir/mdbqs'
 LANGUAGE C IMMUTABLE STRICT;
 
-CREATE FUNCTION mdbquery_q(cstring) RETURNS cstring
-AS '$libdir/mdbqs'
-LANGUAGE C IMMUTABLE STRICT;
-
 CREATE FUNCTION json_mdbquery_exec(jsonb, mdbquery) RETURNS bool
 AS '$libdir/mdbqs'
 LANGUAGE C STRICT IMMUTABLE;

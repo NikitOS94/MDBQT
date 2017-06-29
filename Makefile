@@ -1,5 +1,5 @@
 MODULE_big = mdbqs
-OBJS = mdbqs_gram.o mdbqs_scan.o get_query.o create_query.o
+OBJS = mdbqs_gram.o mdbqs_scan.o get_query.o create_query.o jsquery_calls.o
 INCLUDES = structures.h
 INCLUDEDIR = $(shell $(PG_CONFIG) --includedir-server)
 EXTENSION = mdbqs        	# the extensions name
@@ -8,8 +8,7 @@ REGRESS = mdbqs_test     	# our test script file (without extension)
 MODULES = mdbqs          	# our c module file to build
 ENCODING = UTF8
 
-#EXTRA_CLEAN = y.tab.c y.tab.h \
-#				mdbqs_gram.c mdbqs_scan.c mdbqs_gram.h
+#EXTRA_CLEAN = mdbqs_gram.c mdbqs_scan.c mdbqs_gram.h get_query.o mdbqs_gram.o mdbqs_scan.o create_query.o jsquery_calls.o
 
 # postgres build stuff
 PG_CONFIG = pg_config
