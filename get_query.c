@@ -7,66 +7,43 @@
 #include "utils/builtins.h"
 #include "utils/pg_crc.h"
 #include "miscadmin.h"
-#include "utils/jsonb.h"
 
 #include "structures.h"
 #include "get_query.h"
 
-void 
-nSError(char *s) 
-{ 
-    //fprintf (stderr, "\n%s not supported by jsquery \n", s); 
-    exit(0);
-}
-
-char* sconcat1(char *form, char *s1, int plus) 
+//Function for concatination 1 string with form
+static char* 
+sconcat1(char *form, char *s1, int plus) 
 {
-
-    size_t len1 = strlen(s1);               
-
-    char *result = palloc(len1 + 1 + plus);
-
-    if (!result) {
-      //  fprintf(stderr, "malloc() failed: insufficient memory!\n");
-        return NULL;
-    }
+    size_t   len1 = strlen(s1);               
+    char    *result = palloc(len1 + 1 + plus);
 
     sprintf(result,form,s1);  
 
     return result;
 }
 
-char* sconcat2(char *form, char *s1, char *s2, int plus) 
+//Function for concatination 2 strings with form
+static char* 
+sconcat2(char *form, char *s1, char *s2, int plus) 
 {
-
-    size_t len1 = strlen(s1);
-    size_t len2 = strlen(s2);                      
-
-    char *result = palloc(len1 + len2 + 1 + plus);
-
-    if (!result) {
-       // fprintf(stderr, "malloc() failed: insufficient memory!\n");
-        return NULL;
-    }
-
+    size_t   len1 = strlen(s1);
+    size_t   len2 = strlen(s2);                      
+    char    *result = palloc(len1 + len2 + 1 + plus);
+    
     sprintf(result,form,s1,s2);  
 
     return result;
 }
 
-char* sconcat3(char *form, char *s1, char *s2, char *s3, int plus) 
+//Function for concatination 3 strings with form
+static char* 
+sconcat3(char *form, char *s1, char *s2, char *s3, int plus) 
 {
-
-    size_t len1 = strlen(s1);
-    size_t len2 = strlen(s2); 
-    size_t len3 = strlen(s3);                      
-
-    char *result = palloc(len1 + len2 + len3 + 1 + plus);
-
-    if (!result) {
-     //   fprintf(stderr, "malloc() failed: insufficient memory!\n");
-        return NULL;
-    }
+    size_t   len1 = strlen(s1);
+    size_t   len2 = strlen(s2); 
+    size_t   len3 = strlen(s3);                      
+    char    *result = palloc(len1 + len2 + len3 + 1 + plus);
 
     sprintf(result, form, s1, s2, s3);  
 
@@ -76,35 +53,30 @@ char* sconcat3(char *form, char *s1, char *s2, char *s3, int plus)
 char *
 get_value_operator_type(value_operator_type vop_type)
 {
-    char *op;
     switch(vop_type)
     {
         case _LESS :
-            op = "<";
-            break;
+            return "<";
         case _EQ :
         case _NOTEQ :
-            op = "=";
-            break;
+            return "=";
         case _LESSEQ :
-            op = "<=";
-            break;
+            return "<=";
         case _GREAT :
-            op = ">";
+            return ">";
         case _GREATEQ :
-            op = ">=";
-            break;
+            return ">=";
         case _TYPE :
-            op = "";
-            break;
+            return "";
         case _SIZE :
-            op = ".@# =";
-            break;
+            return ".@# =";
         case _EXISTS :
-            op = "= *";
+            return "= *";
+        default :
+            elog(ERROR,"This value operator is not supported");
             break;
     }
-    return op;
+    return NULL;
 }
 
 char *
@@ -121,13 +93,14 @@ get_value_type(char *value_type)
     else if(strcmp(value_type, "\"array\"") == 0)         return " IS ARRAY";
     else if(strcmp(value_type, "\"object\"") == 0)        return " IS OBJECT";
     else if(strcmp(value_type, "\"bool\"") == 0)          return " IS BOOLEAN";
-    else                                                  nSError(value_type);
+    else                                                  elog(ERROR, "Jsquery is not supported MongoDB %s value type", value_type);
 }
 
 char *
-get_value_operator(char *key, value_operator *vop)
+get_value_operator(char *key, ValueOperator *vop)
 {
     char *result;
+    char *value;
     char *opr = get_value_operator_type(vop->value_op);
 
     if(vop->value_op == _EXISTS)
@@ -136,7 +109,7 @@ get_value_operator(char *key, value_operator *vop)
         goto WITHOUT_VALUE;
     }
 
-    char *value = get_leaf_value(vop->value);
+    value = getLeafValue(vop->value);
 
     if(vop->value_op == _TYPE)
     {
@@ -164,34 +137,29 @@ get_value_operator(char *key, value_operator *vop)
 char *
 get_operator(char *key, operator *op)
 {
-    char *result;
     switch(op->type)
     {
         case NOP :
-            result = get_not_operator(key, (not_operator*) op );
-            break;
+            return get_not_operator(key, (not_operator*) op );
         case MOP :
-            nSError("Module operator not suppported by jsquery"); //not supported by jsquery
+            elog(ERROR, "MongoDB module operator is not supported by jsquery");
         case AOP :
-            result = get_array_operator(key, (array_operator*) op );
-            break;
+            return getArrayOperator(key, (array_operator*) op );
         case VOP :
-            result = get_value_operator(key, (value_operator*) op );
-            break;
+            return get_value_operator(key, (ValueOperator*) op );
+        default  :
+            return NULL;
     }
-    
-    return result;
 }
 
 char * 
 get_not_operator(char *key, not_operator *op)
 {
     char *oper = get_operator(key,op->op);
-    char *result = sconcat1("NOT (%s)", oper, 6);
-
+    
     pfree(op);
-
-    return result;
+    
+    return sconcat1("NOT (%s)", oper, 6);
 }
 
 char *
@@ -223,18 +191,18 @@ get_operator_object(char *key, operator_object *op_object)
 }
 
 char*
-get_leaf_value_eq(char *key, leaf_value *lv)
+getLeafValue_eq(char *key, LeafValue *lv)
 {
-    char *result = sconcat2("%s = %s", key, get_leaf_value(lv), 3);
+    char *result = sconcat2("%s = %s", key, getLeafValue(lv), 3);
     pfree(lv);
 
     return result;
 }
 
 char *
-get_leaf_clause_value(char *key, value *val)
+get_leaf_clause_value(char *key, MDBValue *val)
 { 
-    return (val->type ? get_operator_object(key, val->oob) : get_leaf_value_eq(key, val->lv) );
+    return (val->type ? get_operator_object(key, val->oob) : getLeafValue_eq(key, val->lv) );
 }
 
 char *
@@ -246,7 +214,7 @@ get_leaf_clause(leaf_clause *lc)
 }
 
 char *
-get_expression_operator(expression_operator_type exp_op)
+getExpression_operator(expression_operator_type exp_op)
 {
     switch(exp_op)
     {
@@ -256,28 +224,35 @@ get_expression_operator(expression_operator_type exp_op)
             return "OR";
         case _NOR :
             return "NOR";
+        default :
+            elog(ERROR,"This expression operator is not supported");
+            break;
     }
+
+    return NULL;
 }
 
 char *
-get_expression_clause(expression_clause* exp_clause)
+getExpression_clause(expression_clause* exp_clause)
 {
     char *str;
-    char *buff="";
+    char *buff;
 
     List *expressionList = exp_clause->expressionList;
     ListCell *cell;
 
-    buff = get_expression((expression *)list_nth(expressionList,0)); 
+    buff = getExpression((Expression *)list_nth(expressionList,0)); 
     if(length(expressionList)>1)
     {
         buff = sconcat1("(%s)", buff, 2);
         list_delete_first(expressionList);
-        char   *expOperator = get_expression_operator(exp_clause->op);
+
+        char   *expOperator;
+        expOperator = getExpression_operator(exp_clause->op);
 
         foreach(cell, expressionList)
         {
-            str = get_expression((expression *)lfirst(cell));
+            str = getExpression((Expression *)lfirst(cell));
             buff = sconcat3("%s %s (%s)", buff, expOperator, str, 4);
         }   
     }
@@ -305,18 +280,20 @@ get_clause(Clause *cl)
         case LEAF :
             return get_leaf_clause((leaf_clause*) cl);
         case COMMENT :
-            nSError("COMMENT clause");  //Not supported by jsquery
+            elog(ERROR, "MpngoDB comment clause is not supported by jsquery");
         case TEXT :
             return get_text_clause((text_clause*) cl);
         case WHERE :
-            nSError("WHERE clause");  //Not supported by jsquery
+            elog(ERROR, "MpngoDB where clause is not supported by jsquery");
         case EXPRESSION :
-            return get_expression_clause((expression_clause*) cl);
+            return getExpression_clause((expression_clause*) cl);
+        default:
+            return NULL;
     }
 }
 
 char *
-get_expression(expression * ex)
+getExpression(Expression * ex)
 {
     char *str;
     char *buff="";
@@ -340,46 +317,40 @@ get_expression(expression * ex)
 }
 
 char *
-get_leaf_value(leaf_value *value)
+getLeafValue(LeafValue *value)
 {
-    char *val;
     switch(value->type)
     {
         case S :
-            val = value->str;
-            break;
+            return value->str;
         case I :
-            val = value->i;
-            break;
+            return value->i;
         case A :
-            val = get_array(value->ar);
-            break;
+            return getArray(value->ar);
         case B :
-            val = (value->b==_false ? "false" : "true");
-            break;
+            return (value->b==_false ? "false" : "true");
         case D :
-            val = value->d;
-            break;
+            return value->d;
     }
 
-    return val;
+    return NULL;
 }
 
 char *
-get_array(_array *ar)
+getArray(_array *ar)
 { 
-    char *str;
-    char *buff="";
+    char        *str;
+    char        *buff;
+    List        *arrayList;
+    ListCell    *cell;
 
-    List *arrayList = ar->arrayList;
-    ListCell *cell;
-
-    buff = get_leaf_value((leaf_value *)list_nth(arrayList, 0)); 
+    arrayList = ar->arrayList;
+    buff = getLeafValue((LeafValue *)list_nth(arrayList, 0)); 
     list_delete_first(arrayList);
 
     foreach(cell, arrayList)
     {
-        str = get_leaf_value((leaf_value *)lfirst(cell));
+        str = getLeafValue((LeafValue *)lfirst(cell));
         buff = sconcat2("%s, %s", str, buff, 2);
     }
 
@@ -390,40 +361,35 @@ get_array(_array *ar)
 }
 
 char *
-get_array_operator_type(array_operator_type aop_type)
+getArrayOperatorType(array_operator_type aop_type)
 {
     switch(aop_type)
     {
-        case _IN:
+        case _IN :
         case _NIN:
             return "<@";
-            break;
         case _ALL:
             return "&&";
-            break;
+        default  :
+            return NULL;
     }
 }
 
 char *
-get_array_operator(char *key, array_operator *aop)
+getArrayOperator(char *key, array_operator *aop)
 {        
-    char *ar = get_array(aop->ar);
-    char *ar_opr = get_array_operator_type(aop->array_op);
-    char *result;
-
-    if(aop->array_op == _NIN)
-        result = sconcat3("NOT (%s %s %s)", key, ar_opr, ar, 8);
-    else
-        result = sconcat3("%s %s %s", key, ar_opr, ar, 2);
-
+    char *ar = getArray(aop->ar);
+    char *ar_opr = getArrayOperatorType(aop->array_op);
     pfree(aop); 
-
-    return result;    
+    
+    if(aop->array_op == _NIN)
+        return sconcat3("NOT (%s %s %s)", key, ar_opr, ar, 8);
+    else
+        return sconcat3("%s %s %s", key, ar_opr, ar, 2);    
 }
 
 char *
-get_jsquery(MDBQuery *qu)
+getJsquery(MDBQuery *qu)
 {
-    char   *expr = get_expression(qu->exp);
-    return expr;
+    return getExpression(qu->exp);
 }

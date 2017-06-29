@@ -7,7 +7,6 @@
 #include "utils/builtins.h"
 #include "utils/pg_crc.h"
 #include "miscadmin.h"
-#include "utils/jsonb.h"
 
 #include "structures.h"
 #include "create_query.h"
@@ -21,7 +20,7 @@ createNewArray(List *arrayList)
 }
 
 List *
-addArrayElement(leaf_value * value, List *arrayList) 
+addArrayElement(LeafValue *value, List *arrayList) 
 {
     return lappend(arrayList, value);
 }
@@ -36,7 +35,7 @@ createNotOperator(operator *op)
 }
 
 operator *
-createModOperator(leaf_value *divisor, leaf_value *remainder) 
+createModOperator(LeafValue *divisor, LeafValue *remainder) 
 {
     mod_operator *new_op = (mod_operator *) palloc(sizeof(mod_operator));
     new_op->type = MOP;
@@ -56,55 +55,55 @@ createArrayOperator(array_operator_type op, _array *ar)
 }
 
 operator *
-createValueOperator(value_operator_type op, leaf_value * value) 
+createValueOperator(value_operator_type op, LeafValue * value) 
 {
-    value_operator *new_op = (value_operator *) palloc(sizeof(value_operator));
+    ValueOperator *new_op = (ValueOperator *) palloc(sizeof(ValueOperator));
     new_op->type = VOP;  
     new_op->value_op = op;
     new_op->value = value;
     return (operator*) new_op;
 }
 
-leaf_value *
+LeafValue *
 createStringValue(char *str)
 {
-    leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
+    LeafValue *lv = (LeafValue *) palloc(sizeof(LeafValue));
     lv->type = S;
     lv->str = str;
     return lv;
 }
 
-leaf_value *
+LeafValue *
 createDoubleValue(char* d)
 {
-    leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
+    LeafValue *lv = (LeafValue *) palloc(sizeof(LeafValue));
     lv->type = D;
     lv->d = d;
     return lv;
 }
 
-leaf_value *
+LeafValue *
 createIntegerValue(char* i)
 {
-    leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
+    LeafValue *lv = (LeafValue *) palloc(sizeof(LeafValue));
     lv->type = I;
     lv->i = i;
     return lv;
 }
 
-leaf_value *
+LeafValue *
 createArrayValue(_array *ar)
 {
-  leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
+  LeafValue *lv = (LeafValue *) palloc(sizeof(LeafValue));
   lv->type = A;
   lv->ar = ar;
   return lv;
 }
 
-leaf_value *
+LeafValue *
 createBooleanValue(_bool b)
 {
-  leaf_value *lv = (leaf_value *) palloc(sizeof(leaf_value));
+  LeafValue *lv = (LeafValue *) palloc(sizeof(LeafValue));
   lv->type = B;
   lv->b = b;
   return lv;
@@ -124,26 +123,26 @@ createOperatorObject(List *operatorList)
     return new_oob;
 }
 
-value *
+MDBValue *
 createOperatorObjectValue(operator_object *oob) 
 {
-    value *vl = (value *) palloc(sizeof(value));
+    MDBValue *vl = (MDBValue *) palloc(sizeof(MDBValue));
     vl->type = OP_OBJECT;
     vl->oob = oob;
     return vl;
 }
 
-value *
-createLeafValueValue(leaf_value *lv) 
+MDBValue *
+createLeafValueValue(LeafValue *lv) 
 {
-    value *vl = (value *) palloc(sizeof(value));
+    MDBValue *vl = (MDBValue *) palloc(sizeof(MDBValue));
     vl->type = LF_VALUE;
     vl->lv = lv;
     return vl;
 }
 
 Clause *
-createLeafClause(char* key, value *vl) 
+createLeafClause(char* key, MDBValue *vl) 
 {
     leaf_clause *new_lc = (leaf_clause *) palloc(sizeof(leaf_clause));
     new_lc->type = LEAF;
@@ -162,16 +161,16 @@ createCommentClause(char *op, char *str)
     return ( Clause* ) new_com_cl;
 }
 
-where_clause_value *
+WhereClauseValue *
 stringToWhereClauseValue(char *str)
 {
-    where_clause_value *wcv = (where_clause_value *) palloc(sizeof(where_clause_value));
+    WhereClauseValue *wcv = (WhereClauseValue *) palloc(sizeof(WhereClauseValue));
     wcv->str = str;   
     return wcv;
 }
 
 Clause *
-createWhereClause(char *op, where_clause_value *wcv)
+createWhereClause(char *op, WhereClauseValue *wcv)
 {
     where_clause *wc = (where_clause *) palloc(sizeof(where_clause));
     wc->type = WHERE;
@@ -186,16 +185,16 @@ addClause(Clause *clause, List *clauseList)
     return lappend(clauseList, clause);
 }
 
-expression *
+Expression *
 createExpression(List *clauseList)
 {
-    expression *exp = (expression *) palloc(sizeof(expression));
+    Expression *exp = (Expression *) palloc(sizeof(Expression));
     exp->clauseList = clauseList;
     return exp;
 }
 
 List *
-addExpression(expression *exp, List *expressionList)
+addExpression(Expression *exp, List *expressionList)
 {
     return lcons(exp, expressionList);
 }
@@ -224,7 +223,7 @@ createTextClause(char* search_str, _bool lang_op, char* lang_str, _bool case_sen
 }
 
 MDBQuery *
-createQuery(expression *exp)
+createQuery(Expression *exp)
 {
     MDBQuery *qu = (MDBQuery *) palloc(sizeof(MDBQuery));
     qu->exp = exp;

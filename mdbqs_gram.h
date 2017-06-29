@@ -82,36 +82,30 @@ typedef union YYSTYPE
 {
 
 /* Line 2068 of yacc.c  */
-#line 72 "mdbqs_gram.y"
+#line 32 "mdbqs_gram.y"
 
     MDBQuery                    *qu;
-    expression                  *exp;
-   
+    Expression                  *exp;
     Clause                      *cl;
-    value                       *vl;
-    leaf_value                  *lv;
-
+    MDBValue                    *vl;
+    LeafValue                   *lv;
     List                        *list;
-
-    where_clause_value          *wcv;
-
+    WhereClauseValue            *wcv;
     char                        *strval;
     int                          intval;
     double                       dubval;
     _array                      *arrval;
     _bool                        boolval;
-    
     array_operator_type          aop_type;
     expression_operator_type     exop_type;
     value_operator_type          valop_type;
-
     operator_object             *oob;
     operator                    *op;
 
 
 
 /* Line 2068 of yacc.c  */
-#line 115 "mdbqs_gram.h"
+#line 109 "mdbqs_gram.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

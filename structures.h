@@ -5,6 +5,8 @@
 #include <stdlib.h>
 
 #include "postgres.h"
+#include "fmgr.h"
+#include "utils/builtins.h"
 
     typedef enum _bool 
     { 
@@ -12,22 +14,22 @@
         _true 
     } _bool;
 
-    typedef enum type_of_leaf_value 
+    typedef enum TypeOfLeafValue 
     { 
         S, 
         I, 
         A, 
         D, 
         B 
-    } type_of_leaf_value;
+    } TypeOfLeafValue;
 
-    typedef enum type_of_operator 
+    typedef enum typeOfOperator 
     { 
         NOP, 
         MOP, 
         AOP, 
         VOP 
-    } type_of_operator;
+    } typeOfOperator;
 
     typedef enum array_operator_type 
     { 
@@ -72,19 +74,19 @@
         OP_OBJECT 
     } type_of_value;
 
-    typedef enum type_of_where_clause_value 
+    typedef enum type_of_WhereClauseValue 
     { 
         STR 
-    } type_of_where_clause_value;
+    } type_of_WhereClauseValue;
 
     typedef struct _array
     {
     	List 	*arrayList;
     } _array;
 
-    typedef struct leaf_value
+    typedef struct LeafValue
     {
-        type_of_leaf_value type;
+        TypeOfLeafValue type;
         union
         {
             char    *str;
@@ -93,27 +95,27 @@
             _bool    b;
             char    *d;
         };
-    } leaf_value;
+    } LeafValue;
 
     /* Operators */
-    typedef struct value_operator
+    typedef struct ValueOperator
     {
-        type_of_operator     type;
+        typeOfOperator     type;
 
         value_operator_type  value_op;
-        leaf_value           *value;
-    } value_operator;
+        LeafValue           *value;
+    } ValueOperator;
 
     typedef struct not_operator
     {
-        type_of_operator type;
+        typeOfOperator type;
 
         struct operator * op;
     } not_operator;
 
     typedef struct array_operator
     {
-        type_of_operator type;
+        typeOfOperator type;
 
         array_operator_type array_op;
         _array *ar;
@@ -121,15 +123,15 @@
 
     typedef struct mod_operator
     {
-        type_of_operator type;
+        typeOfOperator type;
 
-        leaf_value *divisor;
-        leaf_value *remainder;
+        LeafValue *divisor;
+        LeafValue *remainder;
     } mod_operator;
 
     typedef struct operator
     {
-        type_of_operator type;
+        typeOfOperator type;
     } operator;
 
     typedef struct operator_list
@@ -143,21 +145,21 @@
         List *operatorList;
     } operator_object;
 
-    typedef struct value
+    typedef struct MDBValue
     {
         type_of_value type;
         union{
-            leaf_value *lv;
+            LeafValue *lv;
             operator_object *oob;
         };
-    } value;
+    } MDBValue;
 
     typedef struct leaf_clause
     {
-        type_of_clause              type;
+        type_of_clause   type;
 
-        char * key;
-        struct value *vl;
+        char            *key;
+        MDBValue           *vl;
     } leaf_clause;
 
     typedef struct comment_clause
@@ -168,20 +170,20 @@
         char *str;
     } comment_clause;
 
-    typedef struct where_clause_value
+    typedef struct WhereClauseValue
     {
         type_of_clause              type;
 
-        type_of_where_clause_value  val_type;
+        type_of_WhereClauseValue  val_type;
         char *                      str;
-    } where_clause_value;
+    } WhereClauseValue;
 
     typedef struct where_clause
     {
         type_of_clause            type;
 
         char *op;
-        where_clause_value *wcv;
+        WhereClauseValue *wcv;
     } where_clause;
 
     typedef struct text_clause
@@ -200,10 +202,10 @@
         type_of_clause            type;
     } Clause;
 
-    typedef struct expression
+    typedef struct Expression
     {
         List  				*clauseList;
-    } expression;
+    } Expression;
 
     typedef struct expression_clause
     {
@@ -215,7 +217,7 @@
 
     typedef struct MDBQuery
     {
-        expression *exp;
+        Expression *exp;
     } MDBQuery;
 
 #endif

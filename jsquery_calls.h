@@ -8,8 +8,8 @@
 
 extern Datum callJsquery_in(char *query);
 
-extern Datum callJsquery_out(Datum *jsquery_query);
+extern Datum callJsquery_out(Datum jsquery_query);
 
-extern Datum callJsquery_jsonb_exec(Datum *jsonb_data, Datum *jsquery_query);
+extern Datum callJsquery_jsonb_exec(Datum jsonb_data, Datum jsquery_query);
 
 #endif

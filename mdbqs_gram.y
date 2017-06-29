@@ -10,38 +10,6 @@
     #include "miscadmin.h"
     #include "utils/jsonb.h"
 
-    #include "access/htup_details.h"
-    #include "access/sysattr.h"
-    #include "access/xact.h"
-    #include "catalog/dependency.h"
-    #include "catalog/indexing.h"
-    #include "catalog/namespace.h"
-    #include "catalog/objectaccess.h"
-    #include "catalog/pg_collation.h"
-    #include "catalog/pg_depend.h"
-    #include "catalog/pg_extension.h"
-    #include "catalog/pg_namespace.h"
-    #include "catalog/pg_type.h"
-    #include "commands/alter.h"
-    #include "commands/comment.h"
-    #include "commands/defrem.h"
-    #include "commands/extension.h"
-    #include "commands/schemacmds.h"
-    #include "funcapi.h"
-    #include "mb/pg_wchar.h"
-    #include "miscadmin.h"
-    #include "nodes/makefuncs.h"
-    #include "storage/fd.h"
-    #include "tcop/utility.h"
-    #include "utils/acl.h"
-    #include "utils/builtins.h"
-    #include "utils/fmgroids.h"
-    #include "utils/lsyscache.h"
-    #include "utils/memutils.h"
-    #include "utils/rel.h"
-    #include "utils/snapmgr.h"
-    #include "utils/tqual.h"
-
     #include "structures.h"
     #include "get_query.h"
     #include "create_query.h"
@@ -53,42 +21,30 @@
 
     MDBQuery *RET;
 
-    typedef struct yy_buffer_state * YY_BUFFER_STATE;
+    typedef struct yy_buffer_state *YY_BUFFER_STATE;
     extern int yyparse();
     extern YY_BUFFER_STATE yy_scan_string(char * str);
     extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
-
-    void 
-    yyerror(char *s) 
-    { 
-        //fprintf (stderr, "%s\n", s); 
-        exit(0);
-    }
 %}
 
+/* Types of query tree nodes and leafs */
 %union 
 {
     MDBQuery                    *qu;
-    expression                  *exp;
-   
+    Expression                  *exp;
     Clause                      *cl;
-    value                       *vl;
-    leaf_value                  *lv;
-
+    MDBValue                    *vl;
+    LeafValue                   *lv;
     List                        *list;
-
-    where_clause_value          *wcv;
-
+    WhereClauseValue            *wcv;
     char                        *strval;
     int                          intval;
     double                       dubval;
     _array                      *arrval;
     _bool                        boolval;
-    
     array_operator_type          aop_type;
     expression_operator_type     exop_type;
     value_operator_type          valop_type;
-
     operator_object             *oob;
     operator                    *op;
 }
@@ -146,10 +102,8 @@
 %type<boolval> __BOOLEAN    
 %token _INT STRING __DOUBLE __BOOLEAN
 
-/* Scope types */
+/* Scope types  */
 %token LSCOPE RSCOPE COMMA LSQBRACKET RSQBRACKET LRBRACKET RRBRACKET
-
-
 
 %start QUERY
 
@@ -269,8 +223,8 @@ PG_FUNCTION_INFO_V1(mdbquery_in);
 Datum
 mdbquery_in(PG_FUNCTION_ARGS)
 {
-    char *input=PG_GETARG_CSTRING(0);
-    YY_BUFFER_STATE buffer = yy_scan_string(input);
+    char            *input=PG_GETARG_CSTRING(0);
+    YY_BUFFER_STATE  buffer = yy_scan_string(input);
     
     yyparse();
     yy_delete_buffer(buffer);
@@ -278,45 +232,59 @@ mdbquery_in(PG_FUNCTION_ARGS)
     PG_RETURN_MDBQUERY(RET);
 }
 
+/*  
+    Transform mongoDB query tree to jsquery query
+    and call jsquery_out function of jsquery extension.
+*/
 PG_FUNCTION_INFO_V1(mdbquery_out);
 Datum
 mdbquery_out(PG_FUNCTION_ARGS)
 {
     MDBQuery    *input=PG_GETARG_MDBQUERY(0);
-    const char  *JSQUERY_QUERY = get_jsquery(input);
+    char        *JSQUERY_QUERY = getJsquery(input);
     Datum        jsquery_object = callJsquery_in(JSQUERY_QUERY);
 
     PG_RETURN_CSTRING(callJsquery_out(jsquery_object));
 }
 
+/*  
+    Function for mongoDB exec. 
+    On input of function pass jsonb and mdbquery.
+    Mdbquery transform to jsquery and pass to 
+    son_jsquery_exec function of JSquery extension.
+*/
 PG_FUNCTION_INFO_V1(json_mdbquery_exec);
 Datum
 json_mdbquery_exec(PG_FUNCTION_ARGS)
 {
     Jsonb       *jb = PG_GETARG_JSONB(0);
     MDBQuery    *mq = PG_GETARG_MDBQUERY(1);
-    const char  *JSQUERY_QUERY = get_jsquery(mq);
+    char        *JSQUERY_QUERY = getJsquery(mq);
     Datum        js_query = callJsquery_in(JSQUERY_QUERY);
 
     PG_FREE_IF_COPY(jb, 0);
     PG_FREE_IF_COPY(mq, 1);
 
-    return callJsquery_jsonb_exec(jb, js_query);
+    return callJsquery_jsonb_exec(PointerGetDatum(jb), js_query);
 }
 
+/*  
+    Function for mongoDB exec. 
+    On input of function pass jsonb and mdbquery.
+    Mdbquery transform to jsquery and pass to 
+    son_jsquery_exec function of JSquery extension.
+*/
 PG_FUNCTION_INFO_V1(mdbquery_json_exec);
 Datum
 mdbquery_json_exec(PG_FUNCTION_ARGS)
 {
     MDBQuery    *mq = PG_GETARG_MDBQUERY(0);
     Jsonb       *jb = PG_GETARG_JSONB(1);
-    const char  *JSQUERY_QUERY = get_jsquery(mq);
+    char        *JSQUERY_QUERY = getJsquery(mq);
     Datum        js_query = callJsquery_in(JSQUERY_QUERY);
 
     PG_FREE_IF_COPY(mq, 0);
     PG_FREE_IF_COPY(jb, 1);
 
-    return callJsquery_jsonb_exec(jb, js_query);
-}
-
-int yywrap(void){ return 0; }
+    return callJsquery_jsonb_exec(PointerGetDatum(jb), js_query);
+} 

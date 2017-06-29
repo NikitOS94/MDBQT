@@ -44,6 +44,9 @@
 #include "structures.h"
 #include "get_query.h"
 #include "create_query.h"
+#include "jsquery_calls.h"
+
+#define EXTENSION_NAME   "jsquery"
 
 static Oid
 get_extension_schema(Oid ext_oid)
@@ -78,93 +81,62 @@ get_extension_schema(Oid ext_oid)
     return result;
 }
 
+static List *
+get_function_name(char *functionName)
+{
+    Oid         extensionOid;
+    Oid         shemaOid;
+
+    extensionOid = get_extension_oid(EXTENSION_NAME, false);
+    shemaOid = get_extension_schema(extensionOid);
+    return list_make2(makeString(get_namespace_name(shemaOid)), makeString(functionName));
+}
+
 Datum
 callJsquery_in(char *query)
 {
-    const char *EXTENSION_NAME = "jsquery";
-    const char *FUNCTION_NAME = "jsquery_in";
-    const char *JSQUERY_QUERY = query;
-
-    Oid extensionOid;
-    Oid shemaOid;
-    Oid functionOid;
-    Oid jsqueryOid;
-    List *funcname;
-    FmgrInfo *procedure = palloc0(sizeof(FmgrInfo));
-    Oid funcargtypes[1];
+    Oid         functionOid;
+    FmgrInfo   *procedure = palloc0(sizeof(FmgrInfo));
+    Oid         funcargtypes[1];
 
     funcargtypes[0] = CSTRINGOID;
-
- //   jsqueryOid = LookupTypeNameOid(NULL, EXTENSION_NAME, true);
-    extensionOid = get_extension_oid(EXTENSION_NAME, false);
-    shemaOid = get_extension_schema(extensionOid);
-
-    funcname = list_make2(makeString(get_namespace_name(shemaOid)), makeString(FUNCTION_NAME));
-    functionOid = LookupFuncName(funcname, 1, funcargtypes, false);
+    functionOid = LookupFuncName(get_function_name("jsquery_in"), 1, funcargtypes, false);
 
     if (OidIsValid(functionOid))
     {
         fmgr_info(functionOid, procedure); 
-        return FunctionCall1(procedure, JSQUERY_QUERY);
+        return FunctionCall1(procedure, PointerGetDatum(query));
     }
-
-    return NULL;
+    
 }
 
 Datum
-callJsquery_out(Datum *jsquery_query)
+callJsquery_out(Datum jsquery_query)
 {
-    const char *EXTENSION_NAME = "jsquery";
-    const char *FUNCTION_NAME = "jsquery_out";
-
-    Oid extensionOid;
-    Oid shemaOid;
-    Oid functionOid;
-    Oid jsqueryOid;
-    List *funcname;
-    FmgrInfo *procedure = palloc0(sizeof(FmgrInfo));
-    Oid funcargtypes[1];
+    Oid         functionOid;
+    FmgrInfo   *procedure = palloc0(sizeof(FmgrInfo));
+    Oid         funcargtypes[1];
 
     funcargtypes[0] = CSTRINGOID;
-
- //   jsqueryOid = LookupTypeNameOid(NULL, EXTENSION_NAME, true);
-    extensionOid = get_extension_oid(EXTENSION_NAME, false);
-    shemaOid = get_extension_schema(extensionOid);
-
-    funcname = list_make2(makeString(get_namespace_name(shemaOid)), makeString(FUNCTION_NAME));
-    functionOid = LookupFuncName(funcname, 1, funcargtypes, false);
+    functionOid = LookupFuncName(get_function_name("jsquery_out"), 1, funcargtypes, false);
 
     if (OidIsValid(functionOid))
     {
         fmgr_info(functionOid, procedure); 
         return FunctionCall1(procedure, jsquery_query);
     }
-
-    return NULL;
 }
 
 Datum
-callJsquery_jsonb_exec(Datum *jsonb_data, Datum *jsquery_query)
+callJsquery_jsonb_exec(Datum jsonb_data, Datum jsquery_query)
 {
-    const char *EXTENSION_NAME = "jsquery";
-    const char *FUNCTION_NAME = "json_jsquery_exec";
-
-    Oid extensionOid;
-    Oid shemaOid;
-    Oid functionOid;
-    Oid jsqueryOid;
-    List *funcname;
-    FmgrInfo *procedure = palloc0(sizeof(FmgrInfo));
-    Oid funcargtypes[2];
+    Oid         functionOid;
+    FmgrInfo   *procedure = palloc0(sizeof(FmgrInfo));
+    Oid         funcargtypes[2];
 
     funcargtypes[0] = JSONBOID;
     funcargtypes[1] = TypenameGetTypid("jsquery");
-
-    extensionOid = get_extension_oid(EXTENSION_NAME, false);
-    shemaOid = get_extension_schema(extensionOid);
-
-    funcname = list_make2(makeString(get_namespace_name(shemaOid)), makeString(FUNCTION_NAME));
-    functionOid = LookupFuncName(funcname, 2, funcargtypes, false);
+    functionOid = LookupFuncName( get_function_name("json_jsquery_exec"), 2, funcargtypes, false);
 
     if (OidIsValid(functionOid))
     {

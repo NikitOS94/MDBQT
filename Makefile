@@ -8,7 +8,7 @@ REGRESS = mdbqs_test     	# our test script file (without extension)
 MODULES = mdbqs          	# our c module file to build
 ENCODING = UTF8
 
-#EXTRA_CLEAN = mdbqs_gram.c mdbqs_scan.c mdbqs_gram.h get_query.o mdbqs_gram.o mdbqs_scan.o create_query.o jsquery_calls.o
+EXTRA_CLEAN = get_query.o mdbqs_gram.o mdbqs_scan.o create_query.o jsquery_calls.o
 
 # postgres build stuff
 PG_CONFIG = pg_config
@@ -18,5 +18,8 @@ include $(PGXS)
 mdbqs_gram.o: mdbqs_scan.c
 
 mdbqs_gram.c: BISONFLAGS += -dt
+
+maintainer-clean:
+				rm -f mdbqs_gram.c mdbqs_scan.c mdbqs_gram.h
 
 distprep: mdbqs_gram.c mdbqs_scan.c
