@@ -1,3 +1,0 @@
-select '{ qty: { $lt: 20 } }' <=> '{"qty": 22 }' :: jsonb;
-select '{ qty: { $lt: 20 } }' <=> '{"qty": 12 }' :: jsonb;
-select '{"qty": 12 }' :: jsonb <=> '{ qty: { $lt: 20 } }';
