@@ -210,7 +210,7 @@ createExpressionTreeClause(expression_operator_type op, List *expressionList)
 }
 
 Clause *
-createTextClause(char* search_str, _bool lang_op, char* lang_str, _bool case_sense, _bool diacr_sense)
+createTextClause(char *search_str, _bool lang_op, char *lang_str, _bool case_sense, _bool diacr_sense)
 {
     text_clause *text_cl = (text_clause *) palloc(sizeof(text_clause));
     text_cl->type = TEXT;

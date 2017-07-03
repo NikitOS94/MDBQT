@@ -37,9 +37,7 @@ extern char *get_clause(Clause *cl);
 			//Arrray operator
 			extern char *getArrayOperator(char *key, array_operator *aop);
 
-			extern char *getArrayOperatorType(array_operator_type aop_type);
-
-			extern char *getArray(_array *ar);
+			extern char *getArraySequence(_array *ar);
 
 			extern char *getLeafValue(LeafValue *value);
 

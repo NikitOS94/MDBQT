@@ -223,7 +223,7 @@ getExpression_operator(expression_operator_type exp_op)
         case _OR :
             return "OR";
         case _NOR :
-            return "NOR";
+            return "OR NOT";
         default :
             elog(ERROR,"This expression operator is not supported");
             break;
@@ -241,10 +241,17 @@ getExpression_clause(expression_clause* exp_clause)
     List *expressionList = exp_clause->expressionList;
     ListCell *cell;
 
+    char *form;
+
+
     buff = getExpression((Expression *)list_nth(expressionList,0)); 
     if(length(expressionList)>1)
     {
-        buff = sconcat1("(%s)", buff, 2);
+        if(exp_clause->op == _NOR)
+            buff = sconcat1("NOT (%s)", buff, 6);
+        else
+            buff = sconcat1("(%s)", buff, 2);
+    
         list_delete_first(expressionList);
 
         char   *expOperator;
@@ -264,7 +271,7 @@ getExpression_clause(expression_clause* exp_clause)
 }
 
 char *
-get_text_clause(text_clause* t_clause)
+get_text_clause(text_clause *t_clause)
 {
     char   *result = sconcat1("* = %s", t_clause->search_str, 4);
     pfree(t_clause);
@@ -280,11 +287,11 @@ get_clause(Clause *cl)
         case LEAF :
             return get_leaf_clause((leaf_clause*) cl);
         case COMMENT :
-            elog(ERROR, "MpngoDB comment clause is not supported by jsquery");
+            elog(ERROR, "MongoDB comment clause is not supported by jsquery");
         case TEXT :
             return get_text_clause((text_clause*) cl);
         case WHERE :
-            elog(ERROR, "MpngoDB where clause is not supported by jsquery");
+            elog(ERROR, "MongoDB where clause is not supported by jsquery");
         case EXPRESSION :
             return getExpression_clause((expression_clause*) cl);
         default:
@@ -326,7 +333,7 @@ getLeafValue(LeafValue *value)
         case I :
             return value->i;
         case A :
-            return getArray(value->ar);
+            return sconcat1("[%s]", getArraySequence(value->ar), 2);
         case B :
             return (value->b==_false ? "false" : "true");
         case D :
@@ -337,7 +344,7 @@ getLeafValue(LeafValue *value)
 }
 
 char *
-getArray(_array *ar)
+getArrayOper(_array *ar, array_operator_type aop_type)
 { 
     char        *str;
     char        *buff;
@@ -357,35 +364,59 @@ getArray(_array *ar)
     pfree(arrayList);
     pfree(ar);
 
-    return sconcat1("[%s]", buff, 2);
-}
-
-char *
-getArrayOperatorType(array_operator_type aop_type)
-{
     switch(aop_type)
     {
         case _IN :
         case _NIN:
-            return "<@";
+            return sconcat1("<@ (%s)", buff, 2);;
         case _ALL:
-            return "&&";
+            return sconcat1("@> [%s]", buff, 2);;
         default  :
             return NULL;
     }
 }
 
 char *
+getArraySequence(_array *ar)
+{ 
+    char        *str;
+    char        *buff;
+    List        *arrayList;
+    ListCell    *cell;
+
+    arrayList = ar->arrayList;
+    buff = getLeafValue((LeafValue *)list_nth(arrayList, 0)); 
+    list_delete_first(arrayList);
+
+    foreach(cell, arrayList)
+    {
+        str = getLeafValue((LeafValue *)lfirst(cell));
+        buff = sconcat2("%s, %s", str, buff, 2);
+    }
+
+    pfree(arrayList);
+    pfree(ar);
+
+    return buff;
+}
+
+char *
 getArrayOperator(char *key, array_operator *aop)
 {        
-    char *ar = getArray(aop->ar);
-    char *ar_opr = getArrayOperatorType(aop->array_op);
+    char *ar = getArraySequence(aop->ar);
     pfree(aop); 
-    
-    if(aop->array_op == _NIN)
-        return sconcat3("NOT (%s %s %s)", key, ar_opr, ar, 8);
-    else
-        return sconcat3("%s %s %s", key, ar_opr, ar, 2);    
+
+    switch(aop->array_op)
+    {
+        case _IN :
+            return sconcat2("%s IN (%s)", key, ar, 6);
+        case _NIN:
+            return sconcat2("NOT (%s IN (%s))", key, ar, 12);
+        case _ALL:
+            return sconcat2("%s @> [%s]", key, ar, 6);
+        default  :
+            return NULL;
+    } 
 }
 
 char *

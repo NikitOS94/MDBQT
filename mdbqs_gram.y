@@ -25,6 +25,13 @@
     extern int yyparse();
     extern YY_BUFFER_STATE yy_scan_string(char * str);
     extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+
+    void 
+    yyerror(char *s) 
+    { 
+        //fprintf (stderr, "%s\n", s); 
+        exit(0);
+    }
 %}
 
 /* Types of query tree nodes and leafs */
@@ -100,7 +107,7 @@
 %type<strval> __DOUBLE
 %type<arrval> ARRAY
 %type<boolval> __BOOLEAN    
-%token _INT STRING __DOUBLE __BOOLEAN
+%token _INT STRING __DOUBLE __BOOLEAN KEY
 
 /* Scope types  */
 %token LSCOPE RSCOPE COMMA LSQBRACKET RSQBRACKET LRBRACKET RRBRACKET
@@ -139,7 +146,7 @@ TEXT_CLAUSE : LSCOPE TEXT_OPERATOR EQ LSCOPE SEARCH_OPERATOR EQ STRING RSCOPE RS
 
 /*WHERE CLAUSE SECTION*/
                 
-WHERE_CLAUSE : LSCOPE WHERE_OPERATOR EQ LRBRACKET WHERE_CLAUSE_VALUE RRBRACKET RSCOPE { $$ = createWhereClause($2,$5); }
+WHERE_CLAUSE : LSCOPE WHERE_OPERATOR EQ WHERE_CLAUSE_VALUE RSCOPE { $$ = createWhereClause($2,$4); }
              ;
 
 WHERE_CLAUSE_VALUE     : STRING { $$ = stringToWhereClauseValue($1); }
@@ -167,9 +174,6 @@ TREE_OPERATOR          : OR | AND | NOR ;
 
 /* LEAF CLAUSE SECTION */
 LEAF_CLAUSE        : KEY EQ VALUE { $$ = createLeafClause($1, $3); }
-                   ;
-
-KEY                : STRING
                    ;
 
 VALUE              : LEAF_VALUE       { $$ = createLeafValueValue($1); }

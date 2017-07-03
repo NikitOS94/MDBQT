@@ -35,7 +35,7 @@
     { 
         _IN, 
         _NIN, 
-        _ALL 
+        _ALL
     } array_operator_type;
 
     typedef enum expression_operator_type 

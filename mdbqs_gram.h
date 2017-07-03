@@ -65,13 +65,14 @@
      STRING = 283,
      __DOUBLE = 284,
      __BOOLEAN = 285,
-     LSCOPE = 286,
-     RSCOPE = 287,
-     COMMA = 288,
-     LSQBRACKET = 289,
-     RSQBRACKET = 290,
-     LRBRACKET = 291,
-     RRBRACKET = 292
+     KEY = 286,
+     LSCOPE = 287,
+     RSCOPE = 288,
+     COMMA = 289,
+     LSQBRACKET = 290,
+     RSQBRACKET = 291,
+     LRBRACKET = 292,
+     RRBRACKET = 293
    };
 #endif
 
@@ -82,7 +83,7 @@ typedef union YYSTYPE
 {
 
 /* Line 2068 of yacc.c  */
-#line 32 "mdbqs_gram.y"
+#line 39 "mdbqs_gram.y"
 
     MDBQuery                    *qu;
     Expression                  *exp;
@@ -105,7 +106,7 @@ typedef union YYSTYPE
 
 
 /* Line 2068 of yacc.c  */
-#line 109 "mdbqs_gram.h"
+#line 110 "mdbqs_gram.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

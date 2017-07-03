@@ -26,6 +26,7 @@
 \,								{ return COMMA; }
 
 \:								{ yylval.valop_type=_EQ; return EQ; }
+\$(e|E)(q|Q)					{ yylval.valop_type=_EQ; return EQ; }
 \$(l|L)(t|T)					{ yylval.valop_type=_LESS; return LESS; }
 \$(l|L)(t|T)(e|E)				{ yylval.valop_type=_LESSEQ; return LESSEQ; }
 \$(g|G)(t|T)					{ yylval.valop_type=_GREAT; return GREAT; }
@@ -57,8 +58,8 @@
 
 \$mod							{ return MOD_OPERATOR; }
 
-
-([a-zA-Z]*)|(\"[(\\0)\.\, 0-9a-zA-Z]*\")	{yylval.strval=strdup(yytext); return STRING;}	
+([\.0-9a-zA-Z])*				{yylval.strval=strdup(yytext); return KEY;}
+(\"[(\\0)\.\, 0-9a-zA-Z]*\")	{yylval.strval=strdup(yytext); return STRING;}	
 
 [ \t\r\n]      			; // whitespace
 
